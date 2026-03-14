@@ -1979,15 +1979,19 @@ ${context}`;
 
                       // Tooltip info
                       const linkedTasks = cell.linkedTaskIds.map(id => data.tasks.find(t => t.id === id)).filter(Boolean) as Task[];
-                      // Show child board contents in tooltip
-                      const childCellsForTooltip = cell.childBoardId
-                        ? data.cells.filter(c => c.boardId === cell.childBoardId && c.position !== 4 && c.text).sort((a, b) => a.position - b.position)
-                        : [];
-                      const childTasksForTooltip = cell.childBoardId
-                        ? data.tasks.filter(t => t.boardId === cell.childBoardId && t.status !== "draft")
-                        : [];
-                      const hasChildContent = childCellsForTooltip.length > 0 || childTasksForTooltip.length > 0;
-                      const showTooltip = hasText && (isCellCenter ? !isRootGrid : true) && (hasChildContent || linkedTasks.length > 0);
+
+                      // For center cell of sub-grid: show sibling cells (same board, other positions)
+                      // For non-center cells: show child board contents
+                      let tooltipCells: Cell[] = [];
+                      if (isCellCenter && !isRootGrid) {
+                        // Show sibling cells from same board
+                        tooltipCells = data.cells.filter(c => c.boardId === cell.boardId && c.position !== 4 && c.text).sort((a, b) => a.position - b.position);
+                      } else if (cell.childBoardId) {
+                        // Show child board cells
+                        tooltipCells = data.cells.filter(c => c.boardId === cell.childBoardId && c.position !== 4 && c.text).sort((a, b) => a.position - b.position);
+                      }
+                      const hasTooltipContent = tooltipCells.length > 0 || linkedTasks.length > 0;
+                      const showTooltip = hasText && !(isCellCenter && isRootGrid) && hasTooltipContent;
 
                       return (
                         <div key={cell.id} className="mandal-cell mandal-cell-hover"
@@ -2065,10 +2069,10 @@ ${context}`;
                                 {cell.childBoardId && <span style={{ fontSize: 9, color: C.textMuted, fontWeight: 400 }}>▸</span>}
                               </div>
 
-                              {/* Child board cells preview */}
-                              {childCellsForTooltip.length > 0 && (
-                                <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: linkedTasks.length ? 6 : 0 }}>
-                                  {childCellsForTooltip.map(cc => {
+                              {/* Board cells preview */}
+                              {tooltipCells.length > 0 && (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: (!isCellCenter && !cell.childBoardId && linkedTasks.length) ? 6 : 0 }}>
+                                  {tooltipCells.map(cc => {
                                     const ccTasks = cc.linkedTaskIds.map(id => data.tasks.find(t => t.id === id)).filter(Boolean) as Task[];
                                     const doneTasks = ccTasks.filter(t => t.status === "done" || t.status === "reflect");
                                     return (
@@ -2086,8 +2090,8 @@ ${context}`;
                                 </div>
                               )}
 
-                              {/* Direct linked tasks (no child board) */}
-                              {!cell.childBoardId && linkedTasks.length > 0 && (
+                              {/* Direct linked tasks (leaf cell, no child board) */}
+                              {!isCellCenter && !cell.childBoardId && linkedTasks.length > 0 && (
                                 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                                   {linkedTasks.map(t => (
                                     <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -2138,6 +2142,7 @@ ${context}`;
                   })()
                 ) : (
                   /* ===== 3x3 Drill-down View ===== */
+                  <>
                   <div ref={mandalRef} style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, maxWidth: 400, margin: "0 auto", aspectRatio: "1/1", background: C.bg, padding: 12, borderRadius: 16, boxShadow: "0 1px 8px rgba(0,0,0,.04)" }}>
                     {curCells.map(cell => {
                       const isCenter = cell.position === 4;
@@ -2217,6 +2222,29 @@ ${context}`;
                       );
                     })}
                   </div>
+                  {/* Trash drop zone for 3x3 view */}
+                  {dragCellId && (
+                    <div
+                      className="cloud-trash"
+                      onDragOver={e => { e.preventDefault(); e.currentTarget.style.background = "#FEE2E2"; e.currentTarget.style.borderColor = C.rose; }}
+                      onDragLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.borderColor = ""; }}
+                      onDrop={e => {
+                        e.preventDefault();
+                        const cellSource = e.dataTransfer.getData("application/x-cell");
+                        if (cellSource) { clearCell(cellSource); setDragCellId(null); }
+                      }}
+                      style={{
+                        maxWidth: 400, margin: "12px auto 0", padding: "12px 16px",
+                        borderRadius: 12, border: `2px dashed ${C.border}`,
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                        color: C.textMuted, fontSize: 13, fontWeight: 500,
+                        transition: "all .2s cubic-bezier(.25,.46,.45,.94)",
+                      }}
+                    >
+                      <span style={{ fontSize: 18 }}>🗑</span> 여기에 놓으면 초기화
+                    </div>
+                  )}
+                  </>
                 )}
                 </>) : (
                   /* ===== Matrix View ===== */
