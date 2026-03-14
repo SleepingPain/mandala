@@ -96,10 +96,11 @@ interface UserProfile {
   concerns: string;
   rawAnswers: { question: string; answer: string }[];
   completed: boolean;
+  bio: string; // 자유 형식 자기소개/추가 정보
 }
 const PROFILE_KEY = "mandal-profile";
 const loadProfile = (): UserProfile | null => {
-  try { const r = localStorage.getItem(PROFILE_KEY); if (r) return JSON.parse(r); } catch {}
+  try { const r = localStorage.getItem(PROFILE_KEY); if (r) { const p = JSON.parse(r); return { ...p, bio: p.bio ?? "" }; } } catch {}
   return null;
 };
 const saveProfile = (p: UserProfile) => localStorage.setItem(PROFILE_KEY, JSON.stringify(p));
@@ -124,6 +125,7 @@ const profileToContext = (p: UserProfile): string => {
     const extra = p.rawAnswers.slice(ONBOARDING_STEPS.length);
     extra.forEach(a => parts.push(`${a.question}: ${a.answer}`));
   }
+  if (p.bio) parts.push(`\n추가 정보:\n${p.bio}`);
   return parts.join("\n");
 };
 
@@ -489,6 +491,7 @@ export default function App() {
       concerns: answers[4]?.answer || "",
       rawAnswers: answers,
       completed: true,
+      bio: "",
     };
     saveProfile(p);
     setProfile(p);
@@ -2698,8 +2701,21 @@ ${folderTasks.map(t => `- ${t.text} [${t.status}]${t.priority ? ` 우선순위:$
                   <div>💡 {profile.values}</div>
                   <div>🤔 {profile.concerns}</div>
                 </div>
-                <button onClick={() => { setShowSettings(false); setOnboardStep(0); setOnboardAnswers([]); setOnboardInput(""); setAiOnboardQ(null); setShowOnboarding(true); }}
-                  style={{ marginTop: 8, background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 10px", fontSize: 11, cursor: "pointer", color: C.textSub }}>프로필 다시 설정</button>
+                <textarea
+                  value={profile.bio || ""}
+                  onChange={e => {
+                    const newProfile = { ...profile, bio: e.target.value };
+                    setProfile(newProfile);
+                    saveProfile(newProfile);
+                  }}
+                  placeholder="AI에게 알려주고 싶은 추가 정보를 자유롭게 적어주세요.&#10;예: 현재 하는 일, 팀 구성, 진행 중인 프로젝트, 선호하는 작업 방식, 장단기 목표 등"
+                  rows={4}
+                  style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 12, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", marginTop: 8, lineHeight: 1.6 }}
+                />
+                <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                  <button onClick={() => { setShowSettings(false); setOnboardStep(0); setOnboardAnswers([]); setOnboardInput(""); setAiOnboardQ(null); setShowOnboarding(true); }}
+                    style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 10px", fontSize: 11, cursor: "pointer", color: C.textSub }}>프로필 다시 설정</button>
+                </div>
               </div>
             )}
 
