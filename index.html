@@ -56,7 +56,20 @@
       }
       .mandal-cell:hover { transform: scale(1.04); z-index: 1; }
 
+      /* Cell tooltip — hidden by default, shown on hover */
+      .cell-tooltip {
+        opacity: 0; transform: translateX(-50%) translateY(4px);
+        transition: opacity .2s cubic-bezier(.25,.46,.45,.94), transform .2s cubic-bezier(.25,.46,.45,.94);
+      }
+      .mandal-cell-hover:hover .cell-tooltip {
+        opacity: 1; transform: translateX(-50%) translateY(0);
+      }
+
       /* Sub-grid containers */
+      .sub-grid-wrap {
+        transition: transform .3s cubic-bezier(.25,.46,.45,.94), box-shadow .3s cubic-bezier(.25,.46,.45,.94);
+      }
+      .sub-grid-wrap:hover { transform: scale(1.04); z-index: 2; box-shadow: 0 8px 28px rgba(0,0,0,.1); }
       .sub-grid {
         transition: transform .25s cubic-bezier(.25,.46,.45,.94), box-shadow .25s;
       }

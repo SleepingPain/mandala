@@ -822,6 +822,7 @@ ${context}`;
         t.folderId = d.boards.find(b => b.id === c.boardId)?.folderId || t.folderId;
         if (!c.linkedTaskIds.includes(t.id)) c.linkedTaskIds.push(t.id);
         if (!c.text) c.text = t.text;
+        syncCellText(d, c);
       }
     });
     setDragId(null);
@@ -838,6 +839,7 @@ ${context}`;
       // Update task cellPositions
       c1.linkedTaskIds.forEach(tid => { const t = d.tasks.find(x => x.id === tid); if (t) t.cellPosition = c1.position; });
       c2.linkedTaskIds.forEach(tid => { const t = d.tasks.find(x => x.id === tid); if (t) t.cellPosition = c2.position; });
+      syncCellText(d, c1); syncCellText(d, c2);
     });
   };
   const clearCell = (cellId: string) => {
@@ -897,7 +899,19 @@ ${context}`;
     });
     showToast("저장됨");
   };
-  const saveCellEdit = () => { if (editCellId) { up(d => { const c = d.cells.find(x => x.id === editCellId); if (c) c.text = editCellText; }); setEditCellId(null); } };
+  const syncCellText = (d: AppData, cell: { id: string; boardId: string; position: number; text: string; childBoardId: string | null }) => {
+    // If this is a center cell (pos 4) of a child board → sync text up to parent root cell
+    if (cell.position === 4) {
+      const parentCell = d.cells.find(c => c.childBoardId === cell.boardId);
+      if (parentCell) parentCell.text = cell.text;
+    }
+    // If this root cell has a child board → sync text down to child board's center cell
+    if (cell.childBoardId) {
+      const childCenter = d.cells.find(c => c.boardId === cell.childBoardId && c.position === 4);
+      if (childCenter) childCenter.text = cell.text;
+    }
+  };
+  const saveCellEdit = () => { if (editCellId) { up(d => { const c = d.cells.find(x => x.id === editCellId); if (c) { c.text = editCellText; syncCellText(d, c); } }); setEditCellId(null); } };
   const breadcrumb = () => {
     const cr: { label: string; idx: number }[] = [];
     const f = data.folders.find(x => x.id === selFolderId);
@@ -976,6 +990,7 @@ ${context}`;
       d.tasks.push(task);
       c.text = text;
       c.linkedTaskIds.push(task.id);
+      syncCellText(d, c);
     });
     setCellInputId(null);
     setCellInputText("");
@@ -1921,8 +1936,12 @@ ${context}`;
                       else if (isCellCenter && !isRootGrid && pc) cellBg = pc.fill;
                       else if (isRootGrid && rootPc) cellBg = rootPc.fill + "60";
 
+                      // Tooltip info
+                      const linkedTasks = cell.linkedTaskIds.map(id => data.tasks.find(t => t.id === id)).filter(Boolean) as Task[];
+                      const showTooltip = hasText && !isCellCenter && !(isCellCenter && isRootGrid);
+
                       return (
-                        <div key={cell.id} className="mandal-cell"
+                        <div key={cell.id} className="mandal-cell mandal-cell-hover"
                           onDragOver={e => { e.preventDefault(); e.currentTarget.style.background = C.primaryLight; e.currentTarget.style.transform = "scale(1.08)"; }}
                           onDragLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.transform = ""; }}
                           onDrop={e => {
@@ -1982,6 +2001,31 @@ ${context}`;
                               </span>
                             )
                           )}
+
+                          {/* Tooltip on hover */}
+                          {showTooltip && (
+                            <div className="cell-tooltip" style={{
+                              position: "absolute", zIndex: 50, left: "50%", bottom: "calc(100% + 6px)", transform: "translateX(-50%)",
+                              background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10,
+                              padding: "8px 12px", minWidth: 140, maxWidth: 220,
+                              boxShadow: "0 4px 16px rgba(0,0,0,.1)",
+                              pointerEvents: "none",
+                            }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: pc?.text || C.text, marginBottom: linkedTasks.length ? 4 : 0 }}>{cell.text}</div>
+                              {linkedTasks.map(t => (
+                                <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 3 }}>
+                                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: t.status === "done" ? C.accent : t.status === "placed" ? C.primary : C.warm, flexShrink: 0 }} />
+                                  <span style={{ fontSize: 10, color: C.textSub, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.text}</span>
+                                  {t.priority && <span style={{ fontSize: 8, marginLeft: "auto" }}>{priorityMeta[t.priority]?.emoji}</span>}
+                                </div>
+                              ))}
+                              {linkedTasks.length === 0 && cell.childBoardId && (
+                                <div style={{ fontSize: 10, color: C.textMuted }}>하위 보드 있음</div>
+                              )}
+                              {/* Arrow */}
+                              <div style={{ position: "absolute", bottom: -5, left: "50%", transform: "translateX(-50%) rotate(45deg)", width: 8, height: 8, background: C.surface, borderRight: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}` }} />
+                            </div>
+                          )}
                         </div>
                       );
                     };
@@ -1992,7 +2036,7 @@ ${context}`;
                           const isRootGrid = sg.pos === 4;
                           const pc = posTheme[sg.pos];
                           return (
-                            <div key={sg.pos} style={{
+                            <div key={sg.pos} className="sub-grid-wrap" style={{
                               background: isRootGrid ? C.surface : (pc?.bg || C.surfaceAlt) + "80",
                               border: isRootGrid ? `2.5px solid ${C.primary}` : `1.5px solid ${pc?.border || C.border}50`,
                               borderRadius: 14, padding: 5,
