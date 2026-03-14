@@ -87,6 +87,16 @@
       }
       .matrix-zone:hover { box-shadow: inset 0 0 0 2px rgba(99,102,241,.15); }
 
+      /* Desktop sidebar responsive */
+      @media (max-width: 768px) {
+        .mandal-sidebar { display: none !important; }
+      }
+      @media (min-width: 769px) {
+        .mandal-sidebar {
+          position: sticky; top: 60px; max-height: calc(100vh - 80px); overflow-y: auto;
+        }
+      }
+
       /* Smooth scrollbar */
       ::-webkit-scrollbar { width: 4px; height: 4px; }
       ::-webkit-scrollbar-thumb { background: rgba(0,0,0,.1); border-radius: 4px; }

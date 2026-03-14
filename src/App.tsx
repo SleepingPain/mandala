@@ -1372,7 +1372,7 @@ ${context}`;
         </div>
       )}
 
-      <main style={{ flex: 1, maxWidth: 720, width: "100%", margin: "0 auto", padding: hasContent ? "40px 16px 100px" : "0 16px 100px" }}>
+      <main style={{ flex: 1, maxWidth: tab === "mandal" ? 1200 : 720, width: "100%", margin: "0 auto", padding: hasContent ? "40px 16px 100px" : "0 16px 100px", transition: "max-width .3s" }}>
 
         {/* ===== HOME ===== */}
         {tab === "home" && (
@@ -1815,6 +1815,10 @@ ${context}`;
                     ))}
                   </div>
                 )}
+                {/* === Desktop 2-column layout === */}
+                <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+                {/* Left sidebar: word cloud + controls */}
+                <div className="mandal-sidebar" style={{ width: 280, flexShrink: 0 }}>
                 {(() => {
                   const cloudItems = drafts;
                   const maxLen = Math.max(...cloudItems.map(t => t.text.length), 1);
@@ -1917,6 +1921,9 @@ ${context}`;
                     </div>
                   );
                 })()}
+                </div>
+                {/* Right: mandal-art grid */}
+                <div style={{ flex: 1, minWidth: 0 }}>
 
                 {/* === View Mode Segment Control === */}
                 <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
@@ -2040,7 +2047,7 @@ ${context}`;
                               style={{ width: "95%", padding: 2, borderRadius: 5, border: `1.5px solid ${C.primary}`, fontSize: 10, textAlign: "center", outline: "none" }} />
                           ) : hasText ? (
                             <span style={{
-                              fontSize: isCellCenter ? (isRootGrid ? 12 : 10) : 9,
+                              fontSize: isCellCenter ? (isRootGrid ? 14 : 12) : 11,
                               fontWeight: isCellCenter ? 700 : 500,
                               color: isCellCenter && !isRootGrid ? (pc?.text || C.text) : isCellCenter ? C.primary : C.text,
                               wordBreak: "break-word", lineHeight: 1.15, textAlign: "center",
@@ -2112,7 +2119,7 @@ ${context}`;
                     };
 
                     return (
-                      <div ref={mandalRef} style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, maxWidth: 680, margin: "0 auto", padding: 4, animation: "appleIn .4s cubic-bezier(.25,.46,.45,.94)" }}>
+                      <div ref={mandalRef} style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, maxWidth: 900, margin: "0 auto", padding: 4, animation: "appleIn .4s cubic-bezier(.25,.46,.45,.94)" }}>
                         {subGrids.map(sg => {
                           const isRootGrid = sg.pos === 4;
                           const pc = posTheme[sg.pos];
@@ -2415,6 +2422,9 @@ ${context}`;
                     );
                   })()
                 )}
+
+                </div>{/* end right column */}
+                </div>{/* end 2-column layout */}
 
                 {/* Folder memo + links + deadlines */}
                 {selFolderId && (() => {
