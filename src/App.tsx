@@ -1979,7 +1979,15 @@ ${context}`;
 
                       // Tooltip info
                       const linkedTasks = cell.linkedTaskIds.map(id => data.tasks.find(t => t.id === id)).filter(Boolean) as Task[];
-                      const showTooltip = hasText && !isCellCenter && !(isCellCenter && isRootGrid);
+                      // Show child board contents in tooltip
+                      const childCellsForTooltip = cell.childBoardId
+                        ? data.cells.filter(c => c.boardId === cell.childBoardId && c.position !== 4 && c.text).sort((a, b) => a.position - b.position)
+                        : [];
+                      const childTasksForTooltip = cell.childBoardId
+                        ? data.tasks.filter(t => t.boardId === cell.childBoardId && t.status !== "draft")
+                        : [];
+                      const hasChildContent = childCellsForTooltip.length > 0 || childTasksForTooltip.length > 0;
+                      const showTooltip = hasText && (isCellCenter ? !isRootGrid : true) && (hasChildContent || linkedTasks.length > 0);
 
                       return (
                         <div key={cell.id} className="mandal-cell mandal-cell-hover"
@@ -2043,26 +2051,54 @@ ${context}`;
                             )
                           )}
 
-                          {/* Tooltip on hover */}
+                          {/* Tooltip on hover — shows child board preview */}
                           {showTooltip && (
                             <div className="cell-tooltip" style={{
                               position: "absolute", zIndex: 50, left: "50%", bottom: "calc(100% + 6px)", transform: "translateX(-50%)",
-                              background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10,
-                              padding: "8px 12px", minWidth: 140, maxWidth: 220,
-                              boxShadow: "0 4px 16px rgba(0,0,0,.1)",
+                              background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12,
+                              padding: "10px 14px", minWidth: 180, maxWidth: 260,
+                              boxShadow: "0 8px 24px rgba(0,0,0,.12)",
                               pointerEvents: "none",
                             }}>
-                              <div style={{ fontSize: 12, fontWeight: 700, color: pc?.text || C.text, marginBottom: linkedTasks.length ? 4 : 0 }}>{cell.text}</div>
-                              {linkedTasks.map(t => (
-                                <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 3 }}>
-                                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: t.status === "done" ? C.accent : t.status === "placed" ? C.primary : C.warm, flexShrink: 0 }} />
-                                  <span style={{ fontSize: 10, color: C.textSub, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.text}</span>
-                                  {t.priority && <span style={{ fontSize: 8, marginLeft: "auto" }}>{priorityMeta[t.priority]?.emoji}</span>}
+                              <div style={{ fontSize: 12, fontWeight: 700, color: pc?.text || C.primary, marginBottom: 6, display: "flex", alignItems: "center", gap: 4 }}>
+                                {cell.text}
+                                {cell.childBoardId && <span style={{ fontSize: 9, color: C.textMuted, fontWeight: 400 }}>▸</span>}
+                              </div>
+
+                              {/* Child board cells preview */}
+                              {childCellsForTooltip.length > 0 && (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: linkedTasks.length ? 6 : 0 }}>
+                                  {childCellsForTooltip.map(cc => {
+                                    const ccTasks = cc.linkedTaskIds.map(id => data.tasks.find(t => t.id === id)).filter(Boolean) as Task[];
+                                    const doneTasks = ccTasks.filter(t => t.status === "done" || t.status === "reflect");
+                                    return (
+                                      <div key={cc.id} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                                        <span style={{ width: 5, height: 5, borderRadius: 2, background: pc?.fill || C.primaryBorder, flexShrink: 0 }} />
+                                        <span style={{ fontSize: 11, color: C.text, fontWeight: 500, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cc.text}</span>
+                                        {ccTasks.length > 0 && (
+                                          <span style={{ fontSize: 9, color: doneTasks.length === ccTasks.length ? "#059669" : C.textMuted, fontWeight: 600, flexShrink: 0 }}>
+                                            {doneTasks.length}/{ccTasks.length}
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
                                 </div>
-                              ))}
-                              {linkedTasks.length === 0 && cell.childBoardId && (
-                                <div style={{ fontSize: 10, color: C.textMuted }}>하위 보드 있음</div>
                               )}
+
+                              {/* Direct linked tasks (no child board) */}
+                              {!cell.childBoardId && linkedTasks.length > 0 && (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                                  {linkedTasks.map(t => (
+                                    <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: t.status === "done" ? C.accent : t.status === "placed" ? C.primary : C.warm, flexShrink: 0 }} />
+                                      <span style={{ fontSize: 10, color: C.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.text}</span>
+                                      {t.priority && <span style={{ fontSize: 8, marginLeft: "auto" }}>{priorityMeta[t.priority]?.emoji}</span>}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
                               {/* Arrow */}
                               <div style={{ position: "absolute", bottom: -5, left: "50%", transform: "translateX(-50%) rotate(45deg)", width: 8, height: 8, background: C.surface, borderRight: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}` }} />
                             </div>
