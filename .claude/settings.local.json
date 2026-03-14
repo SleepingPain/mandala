@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --version)",
+      "Bash(npm --version)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && npm create vite@latest . -- --template react-ts 2>&1)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && npm install 2>&1)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && npm run dev 2>&1)",
+      "Bash(start http://localhost:3000)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && npm run build 2>&1)",
+      "Bash(npx vercel --version 2>&1 || npm install -g vercel 2>&1)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && npx vercel whoami 2>&1)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && npx vercel deploy --prod ./dist --yes 2>&1)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && npx vercel project rename mandal-art --yes 2>&1)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && rm -rf .vercel)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && npx vercel deploy --prod ./dist --name mandal-art --yes 2>&1)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && npx vercel project inspect dist 2>&1 | head -5)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://mandal-art.vercel.app)",
+      "Bash(curl -sL -o /dev/null -w \"%{http_code} %{url_effective}\" https://mandal-art.vercel.app)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && rm -rf dist/.vercel && mkdir -p .vercel && echo '{\"projectId\":\"prj_JOWzkwF3xMpLrotnpYyahPnFNCyZ\",\"orgId\":\"team_hi8R6tLkv6Bwp4nuzMyzLR55\",\"projectName\":\"mandal-art\"}' > .vercel/project.json)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && npx vercel deploy --prod --yes 2>&1)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && npm run build 2>&1 && npx vercel deploy --prod --yes 2>&1)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && npx tsc --noEmit 2>&1 | head -30)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && npm run build 2>&1 | tail -10)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && npx vercel --prod 2>&1 | tail -10)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && npx tsc --noEmit 2>&1 | head -20)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && npm run build 2>&1 | tail -8)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && npx vercel --prod 2>&1 | tail -8)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && npx vercel --prod 2>&1 | tail -6)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && npx tsc --noEmit 2>&1 | head -10)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && npx tsc --noEmit 2>&1 | head -5)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && npx vercel --prod 2>&1 | grep \"Aliased\")",
+      "Bash(cd \"/c/Users/admin/Desktop/만다라트\" && npm run dev)",
+      "Bash(cd \"C:\\\\Users\\\\admin\\\\Desktop\\\\만다라트\" && npx tsc -b --noEmit 2>&1 | head -30)",
+      "Bash(cd \"C:\\\\Users\\\\admin\\\\Desktop\\\\만다라트\" && npx tsc -b --noEmit 2>&1 | head -20)",
+      "Bash(cd \"C:\\\\Users\\\\admin\\\\Desktop\\\\만다라트\" && npx tsc -b --noEmit 2>&1 | head -10)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && npx vite build 2>&1 | tail -10)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && gh auth status 2>&1)",
+      "Bash(cd \"C:/Users/admin/Desktop/만다라트\" && gh auth login --web 2>&1)"
+    ]
+  }
+}
