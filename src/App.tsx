@@ -370,6 +370,47 @@ export default function App() {
   // Persist nav state
   useEffect(() => { saveNav({ tab, selFolderId, boardPath }); }, [tab, selFolderId, boardPath]);
 
+  // Browser back/forward button support for mandal-art drill-down
+  const boardPathRef = useRef(boardPath);
+  boardPathRef.current = boardPath;
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
+
+  useEffect(() => {
+    // Push initial state
+    if (!window.history.state?._mandal) {
+      window.history.replaceState({ _mandal: true, boardPath, tab }, "");
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Push state when boardPath or tab changes (but not from popstate)
+  const isPopRef = useRef(false);
+  useEffect(() => {
+    if (isPopRef.current) { isPopRef.current = false; return; }
+    window.history.pushState({ _mandal: true, boardPath, tab }, "");
+  }, [boardPath, tab]);
+
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      const state = e.state;
+      if (state?._mandal) {
+        isPopRef.current = true;
+        if (state.tab) setTab(state.tab);
+        if (state.boardPath) setBoardPath(state.boardPath);
+      } else {
+        // If no mandal state, go up in board or back to previous tab
+        isPopRef.current = true;
+        if (boardPathRef.current.length > 1) {
+          const newPath = boardPathRef.current.slice(0, -1);
+          setBoardPath(newPath);
+          window.history.pushState({ _mandal: true, boardPath: newPath, tab: tabRef.current }, "");
+        }
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Validate saved nav on mount & auto-open first folder if on mandal tab with no board
   useEffect(() => {
     if (selFolderId && !data.folders.find(f => f.id === selFolderId)) {
