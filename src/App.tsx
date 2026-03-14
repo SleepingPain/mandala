@@ -2241,18 +2241,18 @@ ${context}`;
                                   });
                                 }}
                                   style={{
-                                    position: "absolute", bottom: 3, right: 4,
-                                    background: allDone ? C.accentLight : "rgba(255,255,255,.8)",
-                                    border: allDone ? `1px solid ${C.accentBorder}` : "none",
-                                    borderRadius: 4, cursor: "pointer", fontSize: 10,
-                                    color: allDone ? "#059669" : C.textMuted,
-                                    opacity: allDone ? 1 : 0, padding: "1px 4px",
-                                    transition: "opacity .15s",
-                                    fontWeight: 700,
+                                    position: "absolute", bottom: 4, right: 5,
+                                    width: 22, height: 22, borderRadius: 6,
+                                    background: allDone ? "#059669" : C.surface,
+                                    border: allDone ? "none" : `2px solid ${C.border}`,
+                                    cursor: "pointer", fontSize: 12,
+                                    color: allDone ? "#fff" : C.textMuted,
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    transition: "all .2s cubic-bezier(.25,.46,.45,.94)",
+                                    fontWeight: 700, padding: 0,
+                                    boxShadow: allDone ? "0 2px 6px rgba(5,150,105,.3)" : "none",
                                   }}
-                                  onMouseEnter={e => { e.currentTarget.style.opacity = "1"; }}
-                                  onMouseLeave={e => { if (!allDone) e.currentTarget.style.opacity = "0"; }}
-                                >{allDone ? "✓" : "○"}</button>
+                                >{allDone ? "✓" : ""}</button>
                               )}
                             </>
                           )}
