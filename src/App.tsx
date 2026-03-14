@@ -2150,6 +2150,8 @@ ${context}`;
                       const editing = editCellId === cell.id;
                       const hasText = !!cell.text;
                       const isDraggingThis = dragCellId === cell.id;
+                      const allDone = linked.length > 0 && linked.every(t => t.status === "done" || t.status === "reflect");
+                      const anyDone = linked.some(t => t.status === "done" || t.status === "reflect");
                       return (
                         <div key={cell.id}
                           draggable={!isCenter && hasText && !editing && cellInputId !== cell.id}
@@ -2176,7 +2178,7 @@ ${context}`;
                           }}
                           className="mandal-cell"
                           style={{
-                            background: isCenter ? `linear-gradient(135deg, ${C.primaryLight}, #E0E7FF)` : hasText ? C.surface : C.surfaceAlt,
+                            background: isCenter ? `linear-gradient(135deg, ${C.primaryLight}, #E0E7FF)` : allDone ? C.accentLight : hasText ? C.surface : C.surfaceAlt,
                             border: isCenter ? `2px solid ${C.primary}` : (dragId || dragCellId) ? `2px dashed ${C.primaryBorder}` : `1.5px solid ${C.border}`,
                             borderRadius: 12, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                             padding: 8, cursor: !isCenter && hasText ? "grab" : !isCenter ? "pointer" : "default", position: "relative",
@@ -2196,9 +2198,15 @@ ${context}`;
                             <>
                               {hasText ? (
                                 <div style={{ textAlign: "center", width: "100%" }}>
-                                  <div style={{ fontWeight: isCenter ? 800 : 600, fontSize: isCenter ? 13 : 11, color: isCenter ? C.primary : C.text, lineHeight: 1.3, wordBreak: "break-word" }}>{cell.text}</div>
-                                  {linked.length > 0 && <div style={{ fontSize: 8, color: C.textMuted, marginTop: 3 }}>{linked.length}개 항목</div>}
-                                  {!isCenter && <div style={{ fontSize: 8, color: C.primary, fontWeight: 700, marginTop: 2, opacity: 0.6 }}>▸ 상세</div>}
+                                  <div style={{
+                                    fontWeight: isCenter ? 800 : 600, fontSize: isCenter ? 13 : 11,
+                                    color: allDone ? "#059669" : isCenter ? C.primary : C.text,
+                                    lineHeight: 1.3, wordBreak: "break-word",
+                                    textDecoration: allDone ? "line-through" : "none",
+                                    opacity: allDone ? 0.7 : 1,
+                                  }}>{cell.text}</div>
+                                  {linked.length > 0 && <div style={{ fontSize: 8, color: allDone ? "#059669" : C.textMuted, marginTop: 3 }}>{allDone ? "✓ 완료" : `${linked.filter(t => t.status === "done" || t.status === "reflect").length}/${linked.length}`}</div>}
+                                  {!isCenter && !allDone && <div style={{ fontSize: 8, color: C.primary, fontWeight: 700, marginTop: 2, opacity: 0.6 }}>▸ 상세</div>}
                                 </div>
                               ) : (
                                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
@@ -2216,6 +2224,36 @@ ${context}`;
                                 onMouseEnter={e => { e.currentTarget.style.opacity = "1"; }}
                                 onMouseLeave={e => { e.currentTarget.style.opacity = "0"; }}
                               >✎</button>}
+                              {hasText && !isCenter && linked.length > 0 && (
+                                <button onClick={e => {
+                                  e.stopPropagation();
+                                  up(d => {
+                                    linked.forEach(lt => {
+                                      const t = d.tasks.find(x => x.id === lt.id);
+                                      if (!t) return;
+                                      if (t.status === "done" || t.status === "reflect") {
+                                        t.status = "placed"; t.completedAt = null;
+                                      } else {
+                                        t.status = "done"; t.completedAt = new Date().toISOString();
+                                        gainXP(15);
+                                      }
+                                    });
+                                  });
+                                }}
+                                  style={{
+                                    position: "absolute", bottom: 3, right: 4,
+                                    background: allDone ? C.accentLight : "rgba(255,255,255,.8)",
+                                    border: allDone ? `1px solid ${C.accentBorder}` : "none",
+                                    borderRadius: 4, cursor: "pointer", fontSize: 10,
+                                    color: allDone ? "#059669" : C.textMuted,
+                                    opacity: allDone ? 1 : 0, padding: "1px 4px",
+                                    transition: "opacity .15s",
+                                    fontWeight: 700,
+                                  }}
+                                  onMouseEnter={e => { e.currentTarget.style.opacity = "1"; }}
+                                  onMouseLeave={e => { if (!allDone) e.currentTarget.style.opacity = "0"; }}
+                                >{allDone ? "✓" : "○"}</button>
+                              )}
                             </>
                           )}
                         </div>
