@@ -2242,48 +2242,40 @@ ${context}`;
                             </div>
                           )}
 
-                          {/* Status bar on hover — [준비]-[진행]-[완료] */}
+                          {/* Status dot — always visible, click to cycle */}
                           {hasText && !(isCellCenter && isRootGrid) && (() => {
                             const cellStatus = linkedTasks.length > 0
                               ? (linkedTasks.every(t => t.status === "done" || t.status === "reflect") ? "done" : linkedTasks.some(t => t.status === "placed") ? "placed" : "draft")
                               : "draft";
+                            const statusColor = cellStatus === "done" ? C.accent : cellStatus === "placed" ? C.primary : C.textMuted + "50";
+                            const nextStatus = cellStatus === "draft" ? "placed" : cellStatus === "placed" ? "done" : "draft";
                             return (
-                              <div className="cell-status-bar" onClick={e => e.stopPropagation()} style={{
-                                position: "absolute", bottom: 1, left: "50%", transform: "translateX(-50%) translateY(2px)",
-                                display: "flex", gap: 1, opacity: 0, transition: "all .2s", zIndex: 10,
-                                background: "rgba(255,255,255,.95)", borderRadius: 4, padding: "1px 2px",
-                                boxShadow: "0 1px 4px rgba(0,0,0,.1)", pointerEvents: "auto",
-                              }}>
-                                {([["draft", "준비", C.warm], ["placed", "진행", C.primary], ["done", "완료", C.accent]] as const).map(([st, label, color]) => (
-                                  <button key={st} onClick={e => {
-                                    e.stopPropagation();
-                                    up(d => {
-                                      const c = d.cells.find(x => x.id === cell.id);
-                                      if (!c) return;
-                                      if (c.linkedTaskIds.length > 0) {
-                                        c.linkedTaskIds.forEach(tid => {
-                                          const t = d.tasks.find(x => x.id === tid);
-                                          if (t) { t.status = st; if (st === "done") { t.completedAt = new Date().toISOString(); } else { t.completedAt = null; } }
-                                        });
-                                      } else {
-                                        // Create a task if none linked
-                                        const taskId = uid();
-                                        d.tasks.push({ id: taskId, text: c.text, status: st, memo: "", folderId: d.boards.find(b => b.id === c.boardId)?.folderId || null, boardId: c.boardId, cellPosition: c.position, completedAt: st === "done" ? new Date().toISOString() : null, toReflect: false, _today: false, priority: null, urgency: null, importance: null, category: null, timeSlot: null, clusterId: null, deadline: null });
-                                        c.linkedTaskIds.push(taskId);
-                                      }
+                              <button onClick={e => {
+                                e.stopPropagation();
+                                up(d => {
+                                  const c = d.cells.find(x => x.id === cell.id);
+                                  if (!c) return;
+                                  if (c.linkedTaskIds.length > 0) {
+                                    c.linkedTaskIds.forEach(tid => {
+                                      const t = d.tasks.find(x => x.id === tid);
+                                      if (t) { t.status = nextStatus; t.completedAt = nextStatus === "done" ? new Date().toISOString() : null; }
                                     });
-                                    if (st === "done") gainXP(15);
-                                  }}
-                                    style={{
-                                      background: cellStatus === st ? color : "transparent",
-                                      color: cellStatus === st ? "#fff" : C.textMuted,
-                                      border: "none", borderRadius: 3, cursor: "pointer",
-                                      fontSize: 7, fontWeight: 700, padding: "2px 4px", lineHeight: 1,
-                                      transition: "all .15s", whiteSpace: "nowrap",
-                                    }}
-                                  >{label}</button>
-                                ))}
-                              </div>
+                                  } else {
+                                    const taskId = uid();
+                                    d.tasks.push({ id: taskId, text: c.text, status: nextStatus, memo: "", folderId: d.boards.find(b => b.id === c.boardId)?.folderId || null, boardId: c.boardId, cellPosition: c.position, completedAt: nextStatus === "done" ? new Date().toISOString() : null, toReflect: false, _today: false, priority: null, urgency: null, importance: null, category: null, timeSlot: null, clusterId: null, deadline: null });
+                                    c.linkedTaskIds.push(taskId);
+                                  }
+                                });
+                                if (nextStatus === "done") gainXP(15);
+                              }} style={{
+                                position: "absolute", bottom: 2, right: 2,
+                                width: 10, height: 10, borderRadius: "50%", border: "none", padding: 0,
+                                background: statusColor, cursor: "pointer", zIndex: 5,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                boxShadow: "0 1px 3px rgba(0,0,0,.15)",
+                              }}>
+                                {cellStatus === "done" && <span style={{ color: "#fff", fontSize: 7, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+                              </button>
                             );
                           })()}
                         </div>

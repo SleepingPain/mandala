@@ -52,34 +52,30 @@
 
       /* Mandal cells */
       .mandal-cell {
-        transition: transform .2s cubic-bezier(.25,.46,.45,.94), box-shadow .2s, background .15s;
+        transition: box-shadow .2s, background .15s;
       }
-      .mandal-cell:hover { transform: scale(1.04); z-index: 1; }
+      .mandal-cell:hover { z-index: 3; box-shadow: 0 0 0 2px rgba(99,102,241,.4); }
 
       /* Cell tooltip — hidden by default, shown on hover */
       .cell-tooltip {
-        opacity: 0; transform: translateX(-50%) translateY(4px);
+        opacity: 0; transform: translateX(-50%) translateY(4px); pointer-events: none;
         transition: opacity .2s cubic-bezier(.25,.46,.45,.94), transform .2s cubic-bezier(.25,.46,.45,.94);
       }
       .mandal-cell-hover:hover .cell-tooltip {
-        opacity: 1; transform: translateX(-50%) translateY(0);
+        opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto;
       }
       .mandal-cell-hover:hover .cell-tooltip-trigger {
         opacity: 1 !important;
       }
-      .mandal-cell-hover:hover .cell-status-bar {
-        opacity: 1 !important; transform: translateY(0) !important;
-      }
 
       /* Sub-grid containers */
       .sub-grid-wrap {
-        transition: transform .3s cubic-bezier(.25,.46,.45,.94), box-shadow .3s cubic-bezier(.25,.46,.45,.94);
+        transition: box-shadow .3s cubic-bezier(.25,.46,.45,.94);
       }
-      .sub-grid-wrap:hover { transform: scale(1.04); z-index: 2; box-shadow: 0 8px 28px rgba(0,0,0,.1); }
+      .sub-grid-wrap:hover { z-index: 2; box-shadow: 0 4px 16px rgba(0,0,0,.08); }
       .sub-grid {
-        transition: transform .25s cubic-bezier(.25,.46,.45,.94), box-shadow .25s;
+        transition: box-shadow .25s;
       }
-      .sub-grid:hover { box-shadow: 0 4px 20px rgba(0,0,0,.06); }
 
       /* Segment control */
       .seg-btn {
