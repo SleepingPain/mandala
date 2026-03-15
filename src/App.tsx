@@ -362,6 +362,11 @@ export default function App() {
   const [coachLoading, setCoachLoading] = useState(false);
   const coachEndRef = useRef<HTMLDivElement>(null);
 
+  // Insight state
+  const [insightResult, setInsightResult] = useState<string | null>(null);
+  const [insightLoading, setInsightLoading] = useState(false);
+  const [insightDate, setInsightDate] = useState<string | null>(null);
+
   const mandalRef = useRef<HTMLDivElement>(null);
   const homeRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -836,6 +841,135 @@ ${context}`;
     setCoachInput(prompts[type]);
   };
 
+  // === Insight generation ===
+  const generateInsight = async () => {
+    if (insightLoading) return;
+    setInsightLoading(true);
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const dayOfWeek = ["일", "월", "화", "수", "목", "금", "토"][new Date().getDay()];
+
+      // Gather comprehensive data
+      const allTasks = data.tasks;
+      const doneCount = allTasks.filter(t => t.status === "done" || t.status === "reflect").length;
+      const placedCount = allTasks.filter(t => t.status === "placed").length;
+      const draftCount = allTasks.filter(t => t.status === "draft").length;
+      const totalCount = allTasks.length;
+
+      // Category breakdown
+      const catMap: Record<string, { total: number; done: number; placed: number; draft: number }> = {};
+      allTasks.forEach(t => {
+        const cat = t.category || "미분류";
+        if (!catMap[cat]) catMap[cat] = { total: 0, done: 0, placed: 0, draft: 0 };
+        catMap[cat].total++;
+        if (t.status === "done" || t.status === "reflect") catMap[cat].done++;
+        else if (t.status === "placed") catMap[cat].placed++;
+        else catMap[cat].draft++;
+      });
+      const catBreakdown = Object.entries(catMap).map(([cat, s]) =>
+        `  ${cat}: 총 ${s.total}개 (완료 ${s.done}, 진행중 ${s.placed}, 임시 ${s.draft})`
+      ).join("\n");
+
+      // Folder structure
+      const folderInfo = data.folders.map(f => {
+        const rootCells = data.cells.filter(c => c.boardId === f.rootBoardId && c.text && c.position !== 4);
+        const folderTasks = allTasks.filter(t => t.folderId === f.id);
+        const folderDone = folderTasks.filter(t => t.status === "done" || t.status === "reflect").length;
+        return `  ${f.title}: 하위목표 ${rootCells.length}개, 업무 ${folderTasks.length}개 (완료 ${folderDone})`;
+      }).join("\n");
+
+      // Upcoming deadlines
+      const upcoming = allTasks
+        .filter(t => t.deadline && t.status !== "done" && t.status !== "reflect")
+        .sort((a, b) => (a.deadline || "").localeCompare(b.deadline || ""))
+        .slice(0, 10)
+        .map(t => {
+          const daysLeft = Math.ceil((new Date(t.deadline!).getTime() - Date.now()) / 86400000);
+          return `  - ${t.text} (${t.deadline}, D${daysLeft > 0 ? "-" + daysLeft : daysLeft === 0 ? "-Day" : "+" + Math.abs(daysLeft) + " 지남"})${t.priority ? ` [${priorityMeta[t.priority]?.label || t.priority}]` : ""}`;
+        }).join("\n");
+
+      // Priority distribution
+      const highP = allTasks.filter(t => t.priority === "high" && t.status !== "done" && t.status !== "reflect");
+      const medP = allTasks.filter(t => t.priority === "medium" && t.status !== "done" && t.status !== "reflect");
+
+      // Today's tasks
+      const todayTasks = allTasks.filter(t => t._today);
+      const todayCompleted = todayTasks.filter(t => t.status === "done" || t.status === "reflect");
+
+      // Recent reflections
+      const recentRefs = data.reflections.slice(-5).map(r => `  [${r.date}] ${r.text.slice(0, 150)}`).join("\n");
+
+      // Recent mood
+      const recentMoods = data.dailyMoods.slice(-7).map(m =>
+        `  ${m.date}: ${["", "😫", "😐", "🙂", "😊", "🤩"][m.mood]}${m.note ? ` (${m.note})` : ""}`
+      ).join("\n");
+
+      // Stale tasks (placed but not done for a while)
+      const staleTasks = allTasks.filter(t => t.status === "placed" && !t._today)
+        .slice(0, 10).map(t => `  - ${t.text}${t.category ? ` [${t.category}]` : ""}`).join("\n");
+
+      const prompt = `오늘: ${today} (${dayOfWeek}요일)
+
+${profileContext ? `사용자 프로필:\n${profileContext}\n` : ""}
+=== 전체 업무 현황 ===
+총 업무: ${totalCount}개
+- 완료: ${doneCount}개 (${totalCount > 0 ? Math.round(doneCount / totalCount * 100) : 0}%)
+- 진행중(배치됨): ${placedCount}개
+- 임시(미정리): ${draftCount}개
+
+=== 카테고리별 분포 ===
+${catBreakdown || "없음"}
+
+=== 만다라트 폴더(대목표) 구조 ===
+${folderInfo || "아직 없음"}
+
+=== 다가오는 마감 ===
+${upcoming || "없음"}
+
+=== 미완료 고우선순위 업무 ===
+높음: ${highP.map(t => t.text).join(", ") || "없음"}
+보통: ${medP.map(t => t.text).join(", ") || "없음"}
+
+=== 오늘 할 일 ===
+${todayTasks.length > 0 ? todayTasks.map(t => `  ${t.status === "done" || t.status === "reflect" ? "✅" : "⬜"} ${t.text}`).join("\n") : "설정된 오늘 업무 없음"}
+
+=== 정체된 업무 (배치됐으나 미착수) ===
+${staleTasks || "없음"}
+
+=== 최근 회고 ===
+${recentRefs || "없음"}
+
+=== 최근 기분 추이 ===
+${recentMoods || "없음"}
+
+=== XP/스트릭 ===
+레벨: ${level}, XP: ${xpData.xp}, 연속: ${xpData.streak}일
+
+위 데이터를 종합적으로 분석해서 아래 형식으로 인사이트를 제공해주세요:
+
+1. 📊 현재 상황 요약 (업무의 전체적인 성격과 밸런스)
+2. ✅ 잘 진행되고 있는 부분 (칭찬과 함께)
+3. ⚠️ 주의가 필요한 부분 (마감 임박, 정체된 업무, 불균형 등)
+4. 💡 다가오는 주간/일간 추천 (구체적으로 어떤 업무를 언제 하면 좋을지)
+5. 🎯 중장기 제안 (만다라트 목표 달성을 위한 전략적 조언)
+
+자연스럽고 따뜻한 톤으로, 구체적인 업무명을 언급하며 작성해주세요. 너무 길지 않게 핵심을 전달해주세요.`;
+
+      const result = await callAI(
+        `당신은 만다라트 기반 시간관리/생산성 전문 코치입니다. 사용자의 업무 데이터를 분석하여 실질적이고 구체적인 인사이트를 제공합니다.
+한국어로 답변하며, 데이터에 기반한 객관적 분석과 따뜻한 격려를 균형있게 제공합니다.
+마크다운 없이 일반 텍스트로 응답하되, 이모지와 줄바꿈으로 가독성을 높여주세요.`,
+        prompt
+      );
+      setInsightResult(result);
+      setInsightDate(today);
+      gainXP(15);
+    } catch (e: any) {
+      showToast(`인사이트 오류: ${e.message}`);
+    }
+    setInsightLoading(false);
+  };
+
   // Auto-scroll coach chat
   useEffect(() => {
     coachEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1297,6 +1431,7 @@ ${context}`;
     { key: "home", label: "홈", icon: "◈" },
     { key: "staging", label: "쏟아내기", icon: "📥", badge: drafts.length || null },
     { key: "mandal", label: "정리", icon: "▦" },
+    { key: "insight", label: "인사이트", icon: "💡" },
     { key: "coach", label: "코칭", icon: "🧠" },
   ];
 
@@ -2762,6 +2897,134 @@ ${folderTasks.map(t => `- ${t.text} [${t.status}]${t.priority ? ` 우선순위:$
                     </div>
                   );
                 })()}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ===== INSIGHT ===== */}
+        {tab === "insight" && (
+          <div style={{ paddingTop: 20, animation: "appleIn .4s cubic-bezier(.25,.46,.45,.94)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <h2 style={{ fontSize: 17, fontWeight: 700, color: C.text, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 18 }}>💡</span> 업무 인사이트
+              </h2>
+              {insightDate && <span style={{ fontSize: 11, color: C.textMuted }}>{insightDate} 기준</span>}
+            </div>
+
+            {/* Quick stats cards */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
+              <div style={{ background: C.accentLight, borderRadius: 12, padding: "10px 12px", border: `1px solid ${C.accentBorder}`, textAlign: "center" }}>
+                <div style={{ fontSize: 9, fontWeight: 600, color: "#065F46", marginBottom: 2 }}>완료율</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#059669" }}>
+                  {data.tasks.length > 0 ? Math.round(data.tasks.filter(t => t.status === "done" || t.status === "reflect").length / data.tasks.length * 100) : 0}%
+                </div>
+              </div>
+              <div style={{ background: C.primaryLight, borderRadius: 12, padding: "10px 12px", border: `1px solid ${C.primaryBorder}`, textAlign: "center" }}>
+                <div style={{ fontSize: 9, fontWeight: 600, color: "#4338CA", marginBottom: 2 }}>진행중</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: C.primary }}>
+                  {data.tasks.filter(t => t.status === "placed").length}
+                </div>
+              </div>
+              <div style={{ background: C.warmLight, borderRadius: 12, padding: "10px 12px", border: `1px solid ${C.warmBorder}`, textAlign: "center" }}>
+                <div style={{ fontSize: 9, fontWeight: 600, color: "#92400E", marginBottom: 2 }}>미정리</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: C.warm }}>
+                  {drafts.length}
+                </div>
+              </div>
+            </div>
+
+            {/* Category distribution */}
+            {categories.length > 0 && (
+              <div style={{ background: C.surface, borderRadius: 12, padding: "12px 14px", border: `1px solid ${C.border}`, marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: C.textSub, marginBottom: 8 }}>카테고리별 현황</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {categories.map(cat => {
+                    const catTasks = data.tasks.filter(t => t.category === cat);
+                    const catDone = catTasks.filter(t => t.status === "done" || t.status === "reflect").length;
+                    const pct = catTasks.length > 0 ? Math.round(catDone / catTasks.length * 100) : 0;
+                    const cc = getCategoryColor(cat);
+                    return (
+                      <div key={cat} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: cc.text, background: cc.bg, padding: "2px 8px", borderRadius: 6, border: `1px solid ${cc.border}`, minWidth: 60, textAlign: "center" }}>{cat}</span>
+                        <div style={{ flex: 1, height: 6, background: C.surfaceAlt, borderRadius: 3, overflow: "hidden" }}>
+                          <div style={{ width: `${pct}%`, height: "100%", background: cc.text, borderRadius: 3, transition: "width .5s ease" }} />
+                        </div>
+                        <span style={{ fontSize: 10, color: C.textMuted, minWidth: 40, textAlign: "right" }}>{catDone}/{catTasks.length}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Deadline alerts */}
+            {(() => {
+              const urgentTasks = data.tasks.filter(t => t.deadline && t.status !== "done" && t.status !== "reflect")
+                .map(t => ({ ...t, daysLeft: Math.ceil((new Date(t.deadline!).getTime() - Date.now()) / 86400000) }))
+                .filter(t => t.daysLeft <= 7)
+                .sort((a, b) => a.daysLeft - b.daysLeft);
+              if (urgentTasks.length === 0) return null;
+              return (
+                <div style={{ background: "#FFF1F2", borderRadius: 12, padding: "12px 14px", border: `1px solid #FECDD3`, marginBottom: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#9F1239", marginBottom: 8 }}>⏰ 마감 임박</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {urgentTasks.slice(0, 5).map(t => (
+                      <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+                        <span style={{ color: t.daysLeft <= 1 ? "#DC2626" : t.daysLeft <= 3 ? "#EA580C" : "#92400E", fontWeight: 700, fontSize: 11, minWidth: 45 }}>
+                          {t.daysLeft < 0 ? `D+${Math.abs(t.daysLeft)}` : t.daysLeft === 0 ? "D-Day" : `D-${t.daysLeft}`}
+                        </span>
+                        <span style={{ color: C.text, flex: 1 }}>{t.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Generate insight button */}
+            <button
+              onClick={generateInsight}
+              disabled={insightLoading || data.tasks.length === 0}
+              style={{
+                width: "100%", padding: "14px 16px", borderRadius: 12,
+                background: insightLoading ? C.surfaceAlt : "linear-gradient(135deg, #6366F1, #8B5CF6)",
+                border: "none", cursor: insightLoading || data.tasks.length === 0 ? "default" : "pointer",
+                color: insightLoading ? C.textMuted : "#fff", fontSize: 14, fontWeight: 700,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                transition: "all .3s cubic-bezier(.25,.46,.45,.94)",
+                marginBottom: 16, opacity: data.tasks.length === 0 ? 0.5 : 1,
+              }}
+            >
+              {insightLoading ? (
+                <>
+                  <span style={{ display: "inline-flex", gap: 3 }}>
+                    {[0, 1, 2].map(i => (
+                      <span key={i} style={{ width: 5, height: 5, borderRadius: "50%", background: C.textMuted, animation: `cellPulse 1.2s ease-in-out ${i * 0.15}s infinite` }} />
+                    ))}
+                  </span>
+                  AI 분석 중...
+                </>
+              ) : (
+                <>🔍 {insightResult ? "인사이트 새로고침" : "AI 인사이트 생성"}</>
+              )}
+            </button>
+            {data.tasks.length === 0 && (
+              <p style={{ fontSize: 12, color: C.textMuted, textAlign: "center", marginTop: -8, marginBottom: 16 }}>
+                업무를 추가하면 인사이트를 생성할 수 있어요
+              </p>
+            )}
+
+            {/* AI Insight result */}
+            {insightResult && (
+              <div style={{
+                background: C.surface, borderRadius: 14, padding: "16px 16px 18px",
+                border: `1px solid ${C.primaryBorder}`, marginBottom: 20,
+                boxShadow: "0 2px 12px rgba(99,102,241,.08)",
+              }}>
+                <div style={{ fontSize: 13, lineHeight: 1.75, color: C.text, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                  {insightResult}
+                </div>
               </div>
             )}
           </div>
