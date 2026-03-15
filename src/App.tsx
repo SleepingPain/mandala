@@ -2153,8 +2153,23 @@ ${context}`;
                                 padding: "12px 16px", minWidth: 200, maxWidth: 280,
                                 boxShadow: "0 8px 28px rgba(0,0,0,.15)",
                               }}>
-                                {/* Title */}
-                                <div style={{ fontSize: 13, fontWeight: 700, color: pc?.text || C.primary, marginBottom: 10 }}>{cell.text}</div>
+                                {/* Editable title */}
+                                <input
+                                  defaultValue={cell.text}
+                                  onKeyDown={e => {
+                                    if (e.key === "Enter") {
+                                      const val = (e.target as HTMLInputElement).value.trim();
+                                      if (val && val !== cell.text) { up(d => { const c = d.cells.find(x => x.id === cell.id); if (c) { c.text = val; syncCellText(d, c); } }); }
+                                      setPopoverCellId(null);
+                                    }
+                                    if (e.key === "Escape") setPopoverCellId(null);
+                                  }}
+                                  onBlur={e => {
+                                    const val = e.target.value.trim();
+                                    if (val && val !== cell.text) { up(d => { const c = d.cells.find(x => x.id === cell.id); if (c) { c.text = val; syncCellText(d, c); } }); }
+                                  }}
+                                  style={{ width: "100%", fontSize: 13, fontWeight: 700, color: pc?.text || C.primary, marginBottom: 10, border: "none", borderBottom: `1.5px solid ${C.border}`, background: "transparent", outline: "none", padding: "2px 0", boxSizing: "border-box" }}
+                                />
 
                                 {/* Status buttons */}
                                 <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
@@ -2185,19 +2200,15 @@ ${context}`;
                                   ))}
                                 </div>
 
-                                {/* Action buttons */}
-                                <div style={{ display: "flex", gap: 6, borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
-                                  <button onClick={() => { setEditCellId(cell.id); setEditCellText(cell.text); setPopoverCellId(null); }}
-                                    style={{ flex: 1, padding: "5px 0", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", cursor: "pointer", fontSize: 11, color: C.textSub, fontWeight: 500 }}>
-                                    ✎ 편집
-                                  </button>
-                                  {linkedTasks.length > 0 && (
+                                {/* Detail button */}
+                                {linkedTasks.length > 0 && (
+                                  <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
                                     <button onClick={() => { setSelTaskId(linkedTasks[0].id); setShowDetail(true); setPopoverCellId(null); }}
-                                      style={{ flex: 1, padding: "5px 0", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", cursor: "pointer", fontSize: 11, color: C.textSub, fontWeight: 500 }}>
+                                      style={{ width: "100%", padding: "5px 0", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", cursor: "pointer", fontSize: 11, color: C.textSub, fontWeight: 500 }}>
                                       ▸ 상세
                                     </button>
-                                  )}
-                                </div>
+                                  </div>
+                                )}
 
                                 {/* Arrow */}
                                 <div style={{ position: "absolute", bottom: -5, left: "50%", transform: "translateX(-50%) rotate(45deg)", width: 10, height: 10, background: C.surface, borderRight: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}` }} />
@@ -2210,11 +2221,11 @@ ${context}`;
                             const cellStatus = linkedTasks.length > 0
                               ? (linkedTasks.every(t => t.status === "done" || t.status === "reflect") ? "done" : linkedTasks.some(t => t.status === "placed") ? "placed" : "draft")
                               : "draft";
-                            const statusColor = cellStatus === "done" ? C.accent : cellStatus === "placed" ? C.primary : "transparent";
+                            const statusColor = cellStatus === "done" ? C.accent + "60" : cellStatus === "placed" ? C.primary + "50" : "transparent";
                             return cellStatus !== "draft" ? (
                               <div style={{
                                 position: "absolute", bottom: 0, left: 0, right: 0,
-                                height: 3, borderRadius: "0 0 6px 6px",
+                                height: 2.5, borderRadius: "0 0 6px 6px",
                                 background: statusColor, zIndex: 1, transition: "all .2s",
                               }} />
                             ) : null;
