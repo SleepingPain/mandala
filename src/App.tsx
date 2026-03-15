@@ -2242,15 +2242,15 @@ ${context}`;
                             </div>
                           )}
 
-                          {/* Status dot — always visible, click to cycle */}
+                          {/* Status bar — thin colored line at bottom, click to cycle */}
                           {hasText && !(isCellCenter && isRootGrid) && (() => {
                             const cellStatus = linkedTasks.length > 0
                               ? (linkedTasks.every(t => t.status === "done" || t.status === "reflect") ? "done" : linkedTasks.some(t => t.status === "placed") ? "placed" : "draft")
                               : "draft";
-                            const statusColor = cellStatus === "done" ? C.accent : cellStatus === "placed" ? C.primary : C.textMuted + "50";
+                            const statusColor = cellStatus === "done" ? C.accent : cellStatus === "placed" ? C.primary : "transparent";
                             const nextStatus = cellStatus === "draft" ? "placed" : cellStatus === "placed" ? "done" : "draft";
                             return (
-                              <button onClick={e => {
+                              <div onClick={e => {
                                 e.stopPropagation();
                                 up(d => {
                                   const c = d.cells.find(x => x.id === cell.id);
@@ -2268,14 +2268,11 @@ ${context}`;
                                 });
                                 if (nextStatus === "done") gainXP(15);
                               }} style={{
-                                position: "absolute", bottom: 2, right: 2,
-                                width: 10, height: 10, borderRadius: "50%", border: "none", padding: 0,
+                                position: "absolute", bottom: 0, left: 0, right: 0,
+                                height: cellStatus === "draft" ? 2 : 3, borderRadius: "0 0 6px 6px",
                                 background: statusColor, cursor: "pointer", zIndex: 5,
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                                boxShadow: "0 1px 3px rgba(0,0,0,.15)",
-                              }}>
-                                {cellStatus === "done" && <span style={{ color: "#fff", fontSize: 7, fontWeight: 700, lineHeight: 1 }}>✓</span>}
-                              </button>
+                                transition: "all .2s",
+                              }} title={cellStatus === "draft" ? "클릭: 진행으로" : cellStatus === "placed" ? "클릭: 완료로" : "클릭: 준비로"} />
                             );
                           })()}
                         </div>
