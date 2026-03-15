@@ -96,6 +96,32 @@
       /* Desktop sidebar responsive */
       @media (max-width: 768px) {
         .mandal-sidebar { display: none !important; }
+        /* Mobile: mandal grid full width, horizontal scroll */
+        .mandal-9x9-grid {
+          min-width: 95vw !important;
+          max-width: none !important;
+          padding: 2px !important;
+          gap: 4px !important;
+        }
+        .mandal-9x9-grid .sub-grid-wrap {
+          padding: 3px !important;
+        }
+        .mandal-9x9-grid .sub-grid {
+          gap: 2px !important;
+        }
+        .mandal-9x9-grid .mandal-cell {
+          font-size: 9px !important;
+        }
+        .mandal-9x9-grid .mandal-cell span {
+          font-size: 9px !important;
+        }
+        /* Mobile: allow horizontal scroll for mandal tab */
+        .mandal-scroll-wrap {
+          overflow-x: auto !important;
+          -webkit-overflow-scrolling: touch;
+          margin: 0 -16px;
+          padding: 0 8px;
+        }
       }
       @media (min-width: 769px) {
         .mandal-sidebar {

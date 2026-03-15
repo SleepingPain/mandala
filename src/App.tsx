@@ -2003,7 +2003,7 @@ ${context}`;
                 })()}
                 </div>
                 {/* Right: mandal-art grid */}
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="mandal-scroll-wrap" style={{ flex: 1, minWidth: 0 }}>
 
                 {/* === View Mode Segment Control === */}
                 <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
@@ -2291,7 +2291,7 @@ ${context}`;
                     };
 
                     return (
-                      <div ref={mandalRef} style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, maxWidth: 900, margin: "0 auto", padding: 4, animation: "appleIn .4s cubic-bezier(.25,.46,.45,.94)" }}>
+                      <div ref={mandalRef} className="mandal-9x9-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, maxWidth: 900, margin: "0 auto", padding: 4, animation: "appleIn .4s cubic-bezier(.25,.46,.45,.94)" }}>
                         {subGrids.map(sg => {
                           const isRootGrid = sg.pos === 4;
                           const pc = posTheme[sg.pos];
@@ -3109,6 +3109,53 @@ ${folderTasks.map(t => `- ${t.text} [${t.status}]${t.priority ? ` 우선순위:$
               <Btn variant="primary" onClick={() => { setAiKey(aiKeyInput); setShowSettings(false); showToast("저장됨"); }}>저장</Btn>
               <Btn variant="ghost" onClick={() => setShowSettings(false)}>닫기</Btn>
             </div>
+            <hr style={{ border: "none", borderTop: `1px solid ${C.border}`, marginBottom: 12 }} />
+
+            <label style={{ fontSize: 12, fontWeight: 600, color: C.textSub, display: "block", marginBottom: 8 }}>데이터 백업 / 복원</label>
+            <p style={{ fontSize: 10, color: C.textMuted, marginBottom: 8 }}>다른 기기에서 사용하려면 내보내기 후 가져오기 하세요.</p>
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              <Btn variant="primary" onClick={() => {
+                const backup = {
+                  version: "mandal-v2",
+                  exportedAt: new Date().toISOString(),
+                  data,
+                  profile,
+                  xpData,
+                };
+                const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+                const a = document.createElement("a");
+                a.download = `만다라트_백업_${new Date().toISOString().slice(0, 10)}.json`;
+                a.href = URL.createObjectURL(blob);
+                a.click();
+                URL.revokeObjectURL(a.href);
+                showToast("백업 파일 다운로드 완료");
+              }} style={{ flex: 1, fontSize: 12 }}>📤 내보내기</Btn>
+              <Btn variant="ghost" onClick={() => {
+                const input = document.createElement("input");
+                input.type = "file";
+                input.accept = ".json";
+                input.onchange = (e: any) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = (ev) => {
+                    try {
+                      const backup = JSON.parse(ev.target?.result as string);
+                      if (!backup.data || !backup.version) { alert("올바른 백업 파일이 아닙니다."); return; }
+                      if (!confirm(`${backup.exportedAt?.slice(0, 10) || "알 수 없는 날짜"} 백업을 복원하시겠습니까?\n현재 데이터가 덮어씌워집니다.`)) return;
+                      setData(backup.data);
+                      if (backup.profile) { setProfile(backup.profile); localStorage.setItem(PROFILE_KEY, JSON.stringify(backup.profile)); }
+                      if (backup.xpData) { setXpData(backup.xpData); localStorage.setItem(XP_KEY, JSON.stringify(backup.xpData)); }
+                      showToast("데이터 복원 완료!");
+                      setShowSettings(false);
+                    } catch { alert("파일을 읽을 수 없습니다."); }
+                  };
+                  reader.readAsText(file);
+                };
+                input.click();
+              }} style={{ flex: 1, fontSize: 12 }}>📥 가져오기</Btn>
+            </div>
+
             <hr style={{ border: "none", borderTop: `1px solid ${C.border}`, marginBottom: 12 }} />
             {data.folders.length === 0 && (
               <Btn variant="primary" onClick={() => { loadAnalogData(); setShowSettings(false); }} style={{ width: "100%", fontSize: 12, marginBottom: 8 }}>📋 아날로그 만다라트 불러오기</Btn>
