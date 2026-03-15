@@ -326,6 +326,7 @@ export default function App() {
   const [refText, setRefText] = useState("");
   const [editCellId, setEditCellId] = useState<string | null>(null);
   const [editCellText, setEditCellText] = useState("");
+  const [popoverCellId, setPopoverCellId] = useState<string | null>(null);
   const [inputVal, setInputVal] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -2093,15 +2094,12 @@ ${context}`;
                           onClick={() => {
                             if (cellInputId === cell.id || dragCellId) return;
                             if (isCellCenter && !isRootGrid) {
-                              // Click center of outer sub-grid → drill down
                               const sg = subGrids.find(s => s.pos === outerPos);
                               if (sg?.childBoardId) setBoardPath(p => [...p, sg.childBoardId!]);
                             } else if (!hasText && !(isCellCenter && isRootGrid)) {
                               setCellInputId(cell.id); setCellInputText("");
                             } else if (hasText && !isCellCenter) {
-                              const lt = cell.linkedTaskIds[0] ? data.tasks.find(t => t.id === cell.linkedTaskIds[0]) : null;
-                              if (lt) { setSelTaskId(lt.id); setShowDetail(true); }
-                              else { setEditCellId(cell.id); setEditCellText(cell.text); }
+                              setPopoverCellId(popoverCellId === cell.id ? null : cell.id);
                             }
                           }}
                           style={{
@@ -2142,145 +2140,90 @@ ${context}`;
                             )
                           )}
 
-                          {/* Tooltip on hover — shows child board preview */}
-                          {showTooltip && (
-                            <div className="cell-tooltip" style={{
-                              position: "absolute", zIndex: 50, left: "50%", bottom: "calc(100% + 6px)", transform: "translateX(-50%)",
-                              background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12,
-                              padding: "10px 14px", minWidth: 180, maxWidth: 260,
-                              boxShadow: "0 8px 24px rgba(0,0,0,.12)",
-                              pointerEvents: "auto",
-                            }}>
-                              <div style={{ fontSize: 12, fontWeight: 700, color: pc?.text || C.primary, marginBottom: 6, display: "flex", alignItems: "center", gap: 4 }}>
-                                {cell.text}
-                                {cell.childBoardId && <span style={{ fontSize: 9, color: C.textMuted, fontWeight: 400 }}>▸</span>}
-                              </div>
+                          {/* Popover — click to open, shows status + actions */}
+                          {popoverCellId === cell.id && hasText && !(isCellCenter && isRootGrid) && (() => {
+                            const cellStatus = linkedTasks.length > 0
+                              ? (linkedTasks.every(t => t.status === "done" || t.status === "reflect") ? "done" : linkedTasks.some(t => t.status === "placed") ? "placed" : "draft")
+                              : "draft";
+                            return (
+                              <div onClick={e => e.stopPropagation()} style={{
+                                position: "absolute", zIndex: 60, left: "50%", bottom: "calc(100% + 8px)", transform: "translateX(-50%)",
+                                background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14,
+                                padding: "12px 16px", minWidth: 200, maxWidth: 280,
+                                boxShadow: "0 8px 28px rgba(0,0,0,.15)",
+                              }}>
+                                {/* Title */}
+                                <div style={{ fontSize: 13, fontWeight: 700, color: pc?.text || C.primary, marginBottom: 10 }}>{cell.text}</div>
 
-                              {/* Board cells preview */}
-                              {tooltipCells.length > 0 && (
-                                <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: (!isCellCenter && !cell.childBoardId && linkedTasks.length) ? 6 : 0 }}>
-                                  {tooltipCells.map(cc => {
-                                    const ccTasks = cc.linkedTaskIds.map(id => data.tasks.find(t => t.id === id)).filter(Boolean) as Task[];
-                                    const doneTasks = ccTasks.filter(t => t.status === "done" || t.status === "reflect");
-                                    const ccStatus = ccTasks.length > 0
-                                      ? (ccTasks.every(t => t.status === "done" || t.status === "reflect") ? "done" : ccTasks.some(t => t.status === "placed") ? "placed" : "draft")
-                                      : "draft";
-                                    return (
-                                      <div key={cc.id} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                                        <button onClick={e => {
-                                          e.stopPropagation();
-                                          const nextStatus = ccStatus === "draft" ? "placed" : ccStatus === "placed" ? "done" : "draft";
-                                          up(d => {
-                                            const c = d.cells.find(x => x.id === cc.id);
-                                            if (!c) return;
-                                            if (c.linkedTaskIds.length > 0) {
-                                              c.linkedTaskIds.forEach(tid => {
-                                                const t = d.tasks.find(x => x.id === tid);
-                                                if (t) { t.status = nextStatus; t.completedAt = nextStatus === "done" ? new Date().toISOString() : null; }
-                                              });
-                                            } else {
-                                              const taskId = uid();
-                                              d.tasks.push({ id: taskId, text: c.text, status: nextStatus, memo: "", folderId: d.boards.find(b => b.id === c.boardId)?.folderId || null, boardId: c.boardId, cellPosition: c.position, completedAt: nextStatus === "done" ? new Date().toISOString() : null, toReflect: false, _today: false, priority: null, urgency: null, importance: null, category: null, timeSlot: null, clusterId: null, deadline: null });
-                                              c.linkedTaskIds.push(taskId);
-                                            }
+                                {/* Status buttons */}
+                                <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                                  {([["draft", "준비", C.warm], ["placed", "진행", C.primary], ["done", "완료", C.accent]] as const).map(([st, label, color]) => (
+                                    <button key={st} onClick={() => {
+                                      up(d => {
+                                        const c = d.cells.find(x => x.id === cell.id);
+                                        if (!c) return;
+                                        if (c.linkedTaskIds.length > 0) {
+                                          c.linkedTaskIds.forEach(tid => {
+                                            const t = d.tasks.find(x => x.id === tid);
+                                            if (t) { t.status = st; t.completedAt = st === "done" ? new Date().toISOString() : null; }
                                           });
-                                          if (nextStatus === "done") gainXP(15);
-                                        }} style={{
-                                          width: 14, height: 14, borderRadius: 3, flexShrink: 0, cursor: "pointer",
-                                          border: `1.5px solid ${ccStatus === "done" ? C.accent : ccStatus === "placed" ? C.primary : C.textMuted + "60"}`,
-                                          background: ccStatus === "done" ? C.accent : ccStatus === "placed" ? C.primary + "30" : "transparent",
-                                          display: "flex", alignItems: "center", justifyContent: "center",
-                                          padding: 0, lineHeight: 1,
-                                        }}>
-                                          {ccStatus === "done" && <span style={{ color: "#fff", fontSize: 9, fontWeight: 700 }}>✓</span>}
-                                          {ccStatus === "placed" && <span style={{ color: C.primary, fontSize: 7, fontWeight: 700 }}>●</span>}
-                                        </button>
-                                        <span style={{ fontSize: 11, color: ccStatus === "done" ? C.textMuted : C.text, fontWeight: 500, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: ccStatus === "done" ? "line-through" : "none" }}>{cc.text}</span>
-                                        {ccTasks.length > 0 && (
-                                          <span style={{ fontSize: 9, color: doneTasks.length === ccTasks.length ? "#059669" : C.textMuted, fontWeight: 600, flexShrink: 0 }}>
-                                            {doneTasks.length}/{ccTasks.length}
-                                          </span>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-
-                              {/* Direct linked tasks (leaf cell, no child board) */}
-                              {!isCellCenter && !cell.childBoardId && linkedTasks.length > 0 && (
-                                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                                  {linkedTasks.map(t => (
-                                    <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                      <button onClick={e => {
-                                        e.stopPropagation();
-                                        const nextStatus = t.status === "draft" ? "placed" : t.status === "placed" ? "done" : "draft";
-                                        up(d => {
-                                          const task = d.tasks.find(x => x.id === t.id);
-                                          if (task) { task.status = nextStatus; task.completedAt = nextStatus === "done" ? new Date().toISOString() : null; }
-                                        });
-                                        if (nextStatus === "done") gainXP(15);
-                                      }} style={{
-                                        width: 14, height: 14, borderRadius: "50%", flexShrink: 0, cursor: "pointer",
-                                        border: `1.5px solid ${t.status === "done" || t.status === "reflect" ? C.accent : t.status === "placed" ? C.primary : C.textMuted + "60"}`,
-                                        background: t.status === "done" || t.status === "reflect" ? C.accent : t.status === "placed" ? C.primary + "30" : "transparent",
-                                        display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
-                                      }}>
-                                        {(t.status === "done" || t.status === "reflect") && <span style={{ color: "#fff", fontSize: 9, fontWeight: 700 }}>✓</span>}
-                                        {t.status === "placed" && <span style={{ color: C.primary, fontSize: 7, fontWeight: 700 }}>●</span>}
-                                      </button>
-                                      <span style={{ fontSize: 10, color: t.status === "done" || t.status === "reflect" ? C.textMuted : C.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: t.status === "done" || t.status === "reflect" ? "line-through" : "none" }}>{t.text}</span>
-                                      {t.priority && <span style={{ fontSize: 8, marginLeft: "auto" }}>{priorityMeta[t.priority]?.emoji}</span>}
-                                    </div>
+                                        } else {
+                                          const taskId = uid();
+                                          d.tasks.push({ id: taskId, text: c.text, status: st, memo: "", folderId: d.boards.find(b => b.id === c.boardId)?.folderId || null, boardId: c.boardId, cellPosition: c.position, completedAt: st === "done" ? new Date().toISOString() : null, toReflect: false, _today: false, priority: null, urgency: null, importance: null, category: null, timeSlot: null, clusterId: null, deadline: null });
+                                          c.linkedTaskIds.push(taskId);
+                                        }
+                                      });
+                                      if (st === "done") gainXP(15);
+                                    }} style={{
+                                      flex: 1, padding: "6px 0", borderRadius: 8, cursor: "pointer",
+                                      background: cellStatus === st ? color : C.surfaceAlt,
+                                      color: cellStatus === st ? "#fff" : C.textSub,
+                                      border: cellStatus === st ? "none" : `1px solid ${C.border}`,
+                                      fontSize: 12, fontWeight: 600, transition: "all .15s",
+                                    }}>{label}</button>
                                   ))}
                                 </div>
-                              )}
 
-                              {/* Arrow + hover bridge */}
-                              <div style={{ position: "absolute", bottom: -5, left: "50%", transform: "translateX(-50%) rotate(45deg)", width: 8, height: 8, background: C.surface, borderRight: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}` }} />
-                              <div style={{ position: "absolute", bottom: -10, left: 0, right: 0, height: 14, background: "transparent" }} />
-                            </div>
-                          )}
+                                {/* Action buttons */}
+                                <div style={{ display: "flex", gap: 6, borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
+                                  <button onClick={() => { setEditCellId(cell.id); setEditCellText(cell.text); setPopoverCellId(null); }}
+                                    style={{ flex: 1, padding: "5px 0", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", cursor: "pointer", fontSize: 11, color: C.textSub, fontWeight: 500 }}>
+                                    ✎ 편집
+                                  </button>
+                                  {linkedTasks.length > 0 && (
+                                    <button onClick={() => { setSelTaskId(linkedTasks[0].id); setShowDetail(true); setPopoverCellId(null); }}
+                                      style={{ flex: 1, padding: "5px 0", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", cursor: "pointer", fontSize: 11, color: C.textSub, fontWeight: 500 }}>
+                                      ▸ 상세
+                                    </button>
+                                  )}
+                                </div>
 
-                          {/* Status bar — thin colored line at bottom, click to cycle */}
+                                {/* Arrow */}
+                                <div style={{ position: "absolute", bottom: -5, left: "50%", transform: "translateX(-50%) rotate(45deg)", width: 10, height: 10, background: C.surface, borderRight: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}` }} />
+                              </div>
+                            );
+                          })()}
+
+                          {/* Status indicator — thin bottom bar (visual only) */}
                           {hasText && !(isCellCenter && isRootGrid) && (() => {
                             const cellStatus = linkedTasks.length > 0
                               ? (linkedTasks.every(t => t.status === "done" || t.status === "reflect") ? "done" : linkedTasks.some(t => t.status === "placed") ? "placed" : "draft")
                               : "draft";
                             const statusColor = cellStatus === "done" ? C.accent : cellStatus === "placed" ? C.primary : "transparent";
-                            const nextStatus = cellStatus === "draft" ? "placed" : cellStatus === "placed" ? "done" : "draft";
-                            return (
-                              <div onClick={e => {
-                                e.stopPropagation();
-                                up(d => {
-                                  const c = d.cells.find(x => x.id === cell.id);
-                                  if (!c) return;
-                                  if (c.linkedTaskIds.length > 0) {
-                                    c.linkedTaskIds.forEach(tid => {
-                                      const t = d.tasks.find(x => x.id === tid);
-                                      if (t) { t.status = nextStatus; t.completedAt = nextStatus === "done" ? new Date().toISOString() : null; }
-                                    });
-                                  } else {
-                                    const taskId = uid();
-                                    d.tasks.push({ id: taskId, text: c.text, status: nextStatus, memo: "", folderId: d.boards.find(b => b.id === c.boardId)?.folderId || null, boardId: c.boardId, cellPosition: c.position, completedAt: nextStatus === "done" ? new Date().toISOString() : null, toReflect: false, _today: false, priority: null, urgency: null, importance: null, category: null, timeSlot: null, clusterId: null, deadline: null });
-                                    c.linkedTaskIds.push(taskId);
-                                  }
-                                });
-                                if (nextStatus === "done") gainXP(15);
-                              }} style={{
+                            return cellStatus !== "draft" ? (
+                              <div style={{
                                 position: "absolute", bottom: 0, left: 0, right: 0,
-                                height: cellStatus === "draft" ? 2 : 3, borderRadius: "0 0 6px 6px",
-                                background: statusColor, cursor: "pointer", zIndex: 5,
-                                transition: "all .2s",
-                              }} title={cellStatus === "draft" ? "클릭: 진행으로" : cellStatus === "placed" ? "클릭: 완료로" : "클릭: 준비로"} />
-                            );
+                                height: 3, borderRadius: "0 0 6px 6px",
+                                background: statusColor, zIndex: 1, transition: "all .2s",
+                              }} />
+                            ) : null;
                           })()}
                         </div>
                       );
                     };
 
                     return (
-                      <div ref={mandalRef} className="mandal-9x9-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, maxWidth: 900, margin: "0 auto", padding: 4, animation: "appleIn .4s cubic-bezier(.25,.46,.45,.94)" }}>
+                      <div ref={mandalRef} className="mandal-9x9-grid" onClick={() => setPopoverCellId(null)} style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, maxWidth: 900, margin: "0 auto", padding: 4, animation: "appleIn .4s cubic-bezier(.25,.46,.45,.94)" }}>
                         {subGrids.map(sg => {
                           const isRootGrid = sg.pos === 4;
                           const pc = posTheme[sg.pos];
