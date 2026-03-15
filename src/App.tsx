@@ -2091,7 +2091,8 @@ ${context}`;
                             if (cellSource) { swapCells(cellSource, cell.id); setDragCellId(null); }
                             else dropCell(cell.id);
                           }}
-                          onClick={() => {
+                          onClick={e => {
+                            e.stopPropagation();
                             if (cellInputId === cell.id || dragCellId) return;
                             if (isCellCenter && !isRootGrid) {
                               const sg = subGrids.find(s => s.pos === outerPos);
