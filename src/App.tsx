@@ -2252,12 +2252,39 @@ ${recentMoods || "없음"}
                         >
                           {cellInputId === cell.id ? (
                             <input value={cellInputText} onChange={e => setCellInputText(e.target.value)}
-                              onKeyDown={e => { if (e.key === "Enter") commitCellInput(cell.id); if (e.key === "Escape") setCellInputId(null); }}
-                              onBlur={() => commitCellInput(cell.id)} autoFocus placeholder=""
+                              onKeyDown={e => {
+                                if (e.key === "Enter" && (e.altKey || e.shiftKey)) {
+                                  e.preventDefault();
+                                  commitCellInput(cell.id);
+                                  const boardCells = data.cells.filter(c => c.boardId === cell.boardId).sort((a, b) => a.position - b.position);
+                                  const nextPos = cell.position + 3;
+                                  const nextCell = boardCells.find(c => c.position === nextPos);
+                                  if (nextCell && nextPos <= 8 && nextCell.position !== 4) {
+                                    if (nextCell.text) { setEditCellId(nextCell.id); setEditCellText(nextCell.text); }
+                                    else { setCellInputId(nextCell.id); setCellInputText(""); }
+                                  }
+                                } else if (e.key === "Enter") { commitCellInput(cell.id); }
+                                else if (e.key === "Escape") { setCellInputId(null); }
+                              }}
+                              onBlur={() => { if (!editCellId) commitCellInput(cell.id); }} autoFocus placeholder=""
                               style={{ width: "95%", padding: 2, borderRadius: 5, border: `1.5px solid ${C.accent}`, fontSize: 10, textAlign: "center", outline: "none" }} />
                           ) : editCellId === cell.id ? (
                             <input value={editCellText} onChange={e => setEditCellText(e.target.value)}
-                              onKeyDown={e => e.key === "Enter" && saveCellEdit()} onBlur={saveCellEdit} autoFocus
+                              onKeyDown={e => {
+                                if (e.key === "Enter" && (e.altKey || e.shiftKey)) {
+                                  e.preventDefault();
+                                  saveCellEdit();
+                                  const boardCells = data.cells.filter(c => c.boardId === cell.boardId).sort((a, b) => a.position - b.position);
+                                  const nextPos = cell.position + 3;
+                                  const nextCell = boardCells.find(c => c.position === nextPos);
+                                  if (nextCell && nextPos <= 8 && nextCell.position !== 4) {
+                                    if (nextCell.text) { setEditCellId(nextCell.id); setEditCellText(nextCell.text); }
+                                    else { setCellInputId(nextCell.id); setCellInputText(""); }
+                                  }
+                                } else if (e.key === "Enter") { saveCellEdit(); }
+                                else if (e.key === "Escape") { setEditCellId(null); }
+                              }}
+                              onBlur={() => { if (!cellInputId) saveCellEdit(); }} autoFocus
                               style={{ width: "95%", padding: 2, borderRadius: 5, border: `1.5px solid ${C.primary}`, fontSize: 10, textAlign: "center", outline: "none" }} />
                           ) : hasText ? (
                             <span style={{
@@ -2401,7 +2428,8 @@ ${recentMoods || "없음"}
                 ) : (
                   /* ===== 3x3 Drill-down View ===== */
                   <>
-                  <div ref={mandalRef} style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, maxWidth: 400, margin: "0 auto", aspectRatio: "1/1", background: C.bg, padding: 12, borderRadius: 16, boxShadow: "0 1px 8px rgba(0,0,0,.04)" }}>
+                  <div style={{ display: "flex", alignItems: "stretch", justifyContent: "center", gap: 12, maxWidth: 480, margin: "0 auto" }}>
+                  <div ref={mandalRef} style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, flex: "0 0 400px", maxWidth: 400, aspectRatio: "1/1", background: C.bg, padding: 12, borderRadius: 16, boxShadow: "0 1px 8px rgba(0,0,0,.04)" }}>
                     {curCells.map(cell => {
                       const isCenter = cell.position === 4;
                       const linked = cell.linkedTaskIds.map(id => data.tasks.find(t => t.id === id)).filter(Boolean) as Task[];
@@ -2445,12 +2473,38 @@ ${recentMoods || "없음"}
                             animation: (dragId || dragCellId) && !hasText && !isCenter ? "cellPulse 1.5s ease infinite" : "none",
                           }}>
                           {editing ? (
-                            <input value={editCellText} onChange={e => setEditCellText(e.target.value)} onKeyDown={e => e.key === "Enter" && saveCellEdit()} onBlur={saveCellEdit} autoFocus
+                            <input value={editCellText} onChange={e => setEditCellText(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === "Enter" && (e.altKey || e.shiftKey)) {
+                                  e.preventDefault();
+                                  saveCellEdit();
+                                  const nextPos = cell.position + 3;
+                                  const nextCell = curCells.find(c => c.position === nextPos);
+                                  if (nextCell && nextPos <= 8 && nextCell.position !== 4) {
+                                    if (nextCell.text) { setEditCellId(nextCell.id); setEditCellText(nextCell.text); }
+                                    else { setCellInputId(nextCell.id); setCellInputText(""); }
+                                  }
+                                } else if (e.key === "Enter") { saveCellEdit(); }
+                                else if (e.key === "Escape") { setEditCellId(null); }
+                              }}
+                              onBlur={() => { if (!cellInputId) saveCellEdit(); }} autoFocus
                               style={{ width: "90%", padding: "4px 6px", borderRadius: 8, border: `2px solid ${C.primary}`, fontSize: 12, textAlign: "center", outline: "none" }} />
                           ) : cellInputId === cell.id ? (
                             <input value={cellInputText} onChange={e => setCellInputText(e.target.value)}
-                              onKeyDown={e => { if (e.key === "Enter") commitCellInput(cell.id); if (e.key === "Escape") setCellInputId(null); }}
-                              onBlur={() => commitCellInput(cell.id)} autoFocus placeholder="입력..."
+                              onKeyDown={e => {
+                                if (e.key === "Enter" && (e.altKey || e.shiftKey)) {
+                                  e.preventDefault();
+                                  commitCellInput(cell.id);
+                                  const nextPos = cell.position + 3;
+                                  const nextCell = curCells.find(c => c.position === nextPos);
+                                  if (nextCell && nextPos <= 8 && nextCell.position !== 4) {
+                                    if (nextCell.text) { setEditCellId(nextCell.id); setEditCellText(nextCell.text); }
+                                    else { setCellInputId(nextCell.id); setCellInputText(""); }
+                                  }
+                                } else if (e.key === "Enter") { commitCellInput(cell.id); }
+                                else if (e.key === "Escape") { setCellInputId(null); }
+                              }}
+                              onBlur={() => { if (!editCellId) commitCellInput(cell.id); }} autoFocus placeholder="입력..."
                               style={{ width: "90%", padding: "4px 6px", borderRadius: 8, border: `2px solid ${C.accent}`, fontSize: 12, textAlign: "center", outline: "none" }} />
                           ) : (
                             <>
@@ -2531,28 +2585,31 @@ ${recentMoods || "없음"}
                       );
                     })}
                   </div>
-                  {/* Trash drop zone for 3x3 view */}
-                  {dragCellId && (
-                    <div
-                      className="cloud-trash"
-                      onDragOver={e => { e.preventDefault(); e.currentTarget.style.background = "#FEE2E2"; e.currentTarget.style.borderColor = C.rose; }}
-                      onDragLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.borderColor = ""; }}
-                      onDrop={e => {
-                        e.preventDefault();
-                        const cellSource = e.dataTransfer.getData("application/x-cell");
-                        if (cellSource) { clearCell(cellSource); setDragCellId(null); }
-                      }}
-                      style={{
-                        maxWidth: 400, margin: "12px auto 0", padding: "12px 16px",
-                        borderRadius: 12, border: `2px dashed ${C.border}`,
-                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                        color: C.textMuted, fontSize: 13, fontWeight: 500,
-                        transition: "all .2s cubic-bezier(.25,.46,.45,.94)",
-                      }}
-                    >
-                      <span style={{ fontSize: 18 }}>🗑</span> 여기에 놓으면 초기화
-                    </div>
-                  )}
+                  {/* Trash drop zone — always visible to the right */}
+                  <div
+                    className="cloud-trash"
+                    onDragOver={e => { e.preventDefault(); e.currentTarget.style.background = "#FEE2E2"; e.currentTarget.style.borderColor = "#F87171"; e.currentTarget.style.transform = "scale(1.05)"; }}
+                    onDragLeave={e => { e.currentTarget.style.background = C.surfaceAlt; e.currentTarget.style.borderColor = C.border; e.currentTarget.style.transform = ""; }}
+                    onDrop={e => {
+                      e.preventDefault();
+                      e.currentTarget.style.background = C.surfaceAlt; e.currentTarget.style.borderColor = C.border; e.currentTarget.style.transform = "";
+                      const cellSource = e.dataTransfer.getData("application/x-cell");
+                      if (cellSource) { clearCell(cellSource); setDragCellId(null); }
+                    }}
+                    style={{
+                      flex: "0 0 48px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6,
+                      borderRadius: 12, border: `2px dashed ${dragCellId ? "#F87171" : C.border}`,
+                      background: dragCellId ? "#FEF2F2" : C.surfaceAlt,
+                      color: dragCellId ? "#EF4444" : C.textMuted, fontSize: 11, fontWeight: 500,
+                      transition: "all .25s cubic-bezier(.25,.46,.45,.94)",
+                      opacity: dragCellId ? 1 : 0.5,
+                      cursor: "default", writingMode: "vertical-rl",
+                    }}
+                  >
+                    <span style={{ fontSize: 20, writingMode: "horizontal-tb" }}>🗑</span>
+                    <span style={{ writingMode: "horizontal-tb", fontSize: 10 }}>초기화</span>
+                  </div>
+                  </div>
                   </>
                 )}
                 </>) : (
