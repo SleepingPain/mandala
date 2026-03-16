@@ -74,7 +74,7 @@ interface Task {
 }
 interface Folder { id: string; title: string; color: string; rootBoardId: string; memo: string; }
 interface Board { id: string; folderId: string | null; parentCellId: string | null; title: string; }
-interface Cell { id: string; boardId: string; position: number; text: string; linkedTaskIds: string[]; childBoardId: string | null; }
+interface Cell { id: string; boardId: string; position: number; text: string; linkedTaskIds: string[]; childBoardId: string | null; ongoing?: boolean; color?: string; }
 interface Reflection { id: string; date: string; linkedTaskIds: string[]; text: string; }
 interface Cluster { id: string; label: string; taskIds: string[]; }
 interface Connection { id: string; fromId: string; toId: string; type: "task" | "folder"; }
@@ -354,7 +354,9 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(!loadProfile()?.completed);
 
   const [dragCellId, setDragCellId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"mandal" | "matrix">("mandal");
+  const [viewMode, setViewMode] = useState<"mandal" | "matrix" | "timeline">("mandal");
+  const [showTimeline, setShowTimeline] = useState(false);
+  const [coreCellPopoverId, setCoreCellPopoverId] = useState<string | null>(null);
 
   // Coach chat state
   const [coachMessages, setCoachMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
@@ -2144,7 +2146,7 @@ ${recentMoods || "없음"}
                 {/* === View Mode Segment Control === */}
                 <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
                   <div style={{ display: "inline-flex", background: C.surfaceAlt, borderRadius: 10, padding: 3, gap: 2 }}>
-                    {([["mandal", "만다라트"], ["matrix", "매트릭스"]] as const).map(([key, label]) => (
+                    {([["mandal", "만다라트"], ["matrix", "매트릭스"], ["timeline", "타임라인"]] as const).map(([key, label]) => (
                       <button key={key} className="seg-btn" onClick={() => setViewMode(key as any)}
                         style={{
                           padding: "7px 18px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
@@ -2195,7 +2197,7 @@ ${recentMoods || "없음"}
                       const rootPc = isRootGrid && !isCellCenter ? posTheme[cell.position] : null;
 
                       // Cell background color
-                      let cellBg = hasText ? C.surface : C.surfaceAlt + "90";
+                      let cellBg = hasText ? (cell.color || C.surface) : C.surfaceAlt + "90";
                       if (isCellCenter && isRootGrid) cellBg = `linear-gradient(135deg, ${C.primaryLight}, #E0E7FF)`;
                       else if (isCellCenter && !isRootGrid && pc) cellBg = pc.fill;
                       else if (isRootGrid && rootPc) cellBg = rootPc.fill + "60";
@@ -2230,8 +2232,7 @@ ${recentMoods || "없음"}
                             e.stopPropagation();
                             if (cellInputId === cell.id || dragCellId) return;
                             if (isCellCenter && !isRootGrid) {
-                              const sg = subGrids.find(s => s.pos === outerPos);
-                              if (sg?.childBoardId) setBoardPath(p => [...p, sg.childBoardId!]);
+                              setCoreCellPopoverId(coreCellPopoverId === cell.id ? null : cell.id);
                             } else if (!hasText && !(isCellCenter && isRootGrid)) {
                               setCellInputId(cell.id); setCellInputText("");
                             } else if (hasText && !isCellCenter) {
@@ -2245,7 +2246,8 @@ ${recentMoods || "없음"}
                             padding: 2, cursor: "pointer", position: "relative",
                             border: isCellCenter
                               ? (isRootGrid ? `2px solid ${C.primary}60` : `1.5px solid ${pc?.border || C.border}`)
-                              : `1px solid ${C.border}25`,
+                              : cell.ongoing ? `1.5px solid ${C.primary}40` : `1px solid ${C.border}25`,
+                            borderLeft: !isCellCenter && cell.ongoing ? `3px solid ${C.primary}80` : undefined,
                             animation: dragId && !hasText && !(isCellCenter && isRootGrid) ? "cellPulse 1.5s ease infinite" : "none",
                             transition: "transform .15s, background .15s",
                           }}
@@ -2303,16 +2305,45 @@ ${recentMoods || "없음"}
                             )
                           )}
 
+                          {/* Priority/Importance dot — top-right */}
+                          {hasText && !(isCellCenter && isRootGrid) && (() => {
+                            const highestPriority = linkedTasks.reduce((best, t) => {
+                              const p = t.priority || t.importance;
+                              if (p === "high") return "high";
+                              if (p === "medium" && best !== "high") return "medium";
+                              return best;
+                            }, null as string | null);
+                            if (!highestPriority) return null;
+                            const dotColor = highestPriority === "high" ? "#EF4444" : highestPriority === "medium" ? "#F59E0B" : "#10B981";
+                            return <div style={{ position: "absolute", top: 2, right: 2, width: 6, height: 6, borderRadius: "50%", background: dotColor, zIndex: 2, boxShadow: `0 0 0 1px ${C.surface}` }} />;
+                          })()}
+
+                          {/* D-day indicator — bottom center */}
+                          {hasText && !(isCellCenter && isRootGrid) && (() => {
+                            const deadlineTask = linkedTasks.find(t => t.deadline && t.status !== "done" && t.status !== "reflect");
+                            if (!deadlineTask?.deadline) return null;
+                            const diff = Math.ceil((new Date(deadlineTask.deadline).getTime() - Date.now()) / 86400000);
+                            const dText = diff === 0 ? "오늘" : diff > 0 ? `D-${diff}` : `D+${Math.abs(diff)}`;
+                            const dColor = diff < 0 ? "#EF4444" : diff <= 2 ? "#F59E0B" : "#64748B";
+                            return <div style={{ position: "absolute", bottom: 1, left: "50%", transform: "translateX(-50%)", fontSize: 7, fontWeight: 700, color: dColor, zIndex: 2, lineHeight: 1, whiteSpace: "nowrap" }}>{dText}</div>;
+                          })()}
+
+                          {/* Ongoing/상시 indicator — top-left pin */}
+                          {hasText && cell.ongoing && !(isCellCenter && isRootGrid) && (
+                            <div style={{ position: "absolute", top: 1, left: 2, fontSize: 7, color: C.primary, zIndex: 2, lineHeight: 1 }}>📌</div>
+                          )}
+
                           {/* Popover — click to open, shows status + actions */}
                           {popoverCellId === cell.id && hasText && !(isCellCenter && isRootGrid) && (() => {
                             const cellStatus = linkedTasks.length > 0
                               ? (linkedTasks.every(t => t.status === "done" || t.status === "reflect") ? "done" : linkedTasks.some(t => t.status === "placed") ? "placed" : "draft")
                               : "draft";
+                            const currentPriority = linkedTasks.length > 0 ? linkedTasks[0].priority : null;
                             return (
                               <div onClick={e => e.stopPropagation()} style={{
                                 position: "absolute", zIndex: 60, left: "50%", bottom: "calc(100% + 8px)", transform: "translateX(-50%)",
                                 background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14,
-                                padding: "12px 16px", minWidth: 200, maxWidth: 280,
+                                padding: "12px 16px", minWidth: 220, maxWidth: 300,
                                 boxShadow: "0 8px 28px rgba(0,0,0,.15)",
                               }}>
                                 {/* Editable title */}
@@ -2334,7 +2365,7 @@ ${recentMoods || "없음"}
                                 />
 
                                 {/* Status buttons */}
-                                <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                                <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
                                   {([["draft", "준비", C.warm], ["placed", "진행", C.primary], ["done", "완료", C.accent]] as const).map(([st, label, color]) => (
                                     <button key={st} onClick={() => {
                                       up(d => {
@@ -2362,18 +2393,205 @@ ${recentMoods || "없음"}
                                   ))}
                                 </div>
 
-                                {/* Detail button */}
-                                {linkedTasks.length > 0 && (
-                                  <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
+                                {/* Importance/Priority selector */}
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                                  <span style={{ fontSize: 10, color: C.textMuted, fontWeight: 600, minWidth: 36 }}>중요도</span>
+                                  <div style={{ display: "flex", gap: 4, flex: 1 }}>
+                                    {([["high", "높음", "#EF4444"], ["medium", "보통", "#F59E0B"], ["low", "낮음", "#10B981"]] as const).map(([p, label, color]) => (
+                                      <button key={p} onClick={() => {
+                                        up(d => {
+                                          const c = d.cells.find(x => x.id === cell.id);
+                                          if (!c) return;
+                                          if (c.linkedTaskIds.length > 0) {
+                                            c.linkedTaskIds.forEach(tid => { const t = d.tasks.find(x => x.id === tid); if (t) t.priority = currentPriority === p ? null : p; });
+                                          } else {
+                                            const taskId = uid();
+                                            d.tasks.push({ id: taskId, text: c.text, status: "placed", memo: "", folderId: d.boards.find(b => b.id === c.boardId)?.folderId || null, boardId: c.boardId, cellPosition: c.position, completedAt: null, toReflect: false, _today: false, priority: p, urgency: null, importance: null, category: null, timeSlot: null, clusterId: null, deadline: null });
+                                            c.linkedTaskIds.push(taskId);
+                                          }
+                                        });
+                                      }} style={{
+                                        flex: 1, padding: "4px 0", borderRadius: 6, cursor: "pointer",
+                                        background: currentPriority === p ? color + "18" : C.surfaceAlt,
+                                        color: currentPriority === p ? color : C.textMuted,
+                                        border: currentPriority === p ? `1.5px solid ${color}` : `1px solid ${C.border}`,
+                                        fontSize: 10, fontWeight: 600, transition: "all .15s",
+                                      }}>{label}</button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Color picker */}
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                                  <span style={{ fontSize: 10, color: C.textMuted, fontWeight: 600, minWidth: 36 }}>색상</span>
+                                  <div style={{ display: "flex", gap: 4, flex: 1 }}>
+                                    {[
+                                      { bg: "", label: "기본" },
+                                      { bg: "#FFF1F2", label: "" }, // rose
+                                      { bg: "#FEF3C7", label: "" }, // amber
+                                      { bg: "#DCFCE7", label: "" }, // green
+                                      { bg: "#DBEAFE", label: "" }, // blue
+                                      { bg: "#F3E8FF", label: "" }, // purple
+                                      { bg: "#FFE4E6", label: "" }, // pink
+                                    ].map((c, i) => (
+                                      <button key={i} onClick={() => {
+                                        up(d => { const cl = d.cells.find(x => x.id === cell.id); if (cl) cl.color = c.bg || undefined; });
+                                      }} style={{
+                                        width: 22, height: 22, borderRadius: "50%", cursor: "pointer",
+                                        background: c.bg || C.surface,
+                                        border: (cell.color || "") === c.bg ? `2px solid ${C.primary}` : `1.5px solid ${C.border}`,
+                                        transition: "all .15s",
+                                      }} title={c.label || undefined} />
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Time slot quick assign */}
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                                  <span style={{ fontSize: 10, color: C.textMuted, fontWeight: 600, minWidth: 36 }}>시간</span>
+                                  <div style={{ display: "flex", gap: 2, flex: 1, flexWrap: "wrap" }}>
+                                    {[6, 8, 9, 10, 11, 13, 14, 15, 16, 18, 20].map(h => {
+                                      const hasSlot = linkedTasks.some(t => t.timeSlot?.start === h);
+                                      return (
+                                        <button key={h} onClick={() => {
+                                          up(d => {
+                                            const c = d.cells.find(x => x.id === cell.id);
+                                            if (!c) return;
+                                            if (c.linkedTaskIds.length > 0) {
+                                              c.linkedTaskIds.forEach(tid => {
+                                                const t = d.tasks.find(x => x.id === tid);
+                                                if (t) { t.timeSlot = hasSlot ? null : { start: h, duration: 1 }; if (!t._today) t._today = true; }
+                                              });
+                                            } else {
+                                              const taskId = uid();
+                                              d.tasks.push({ id: taskId, text: c.text, status: "placed", memo: "", folderId: d.boards.find(b => b.id === c.boardId)?.folderId || null, boardId: c.boardId, cellPosition: c.position, completedAt: null, toReflect: false, _today: true, priority: null, urgency: null, importance: null, category: null, timeSlot: { start: h, duration: 1 }, clusterId: null, deadline: null });
+                                              c.linkedTaskIds.push(taskId);
+                                            }
+                                          });
+                                        }} style={{
+                                          padding: "2px 4px", borderRadius: 4, cursor: "pointer",
+                                          background: hasSlot ? C.primary : C.surfaceAlt,
+                                          color: hasSlot ? "#fff" : C.textMuted,
+                                          border: `1px solid ${hasSlot ? C.primary : C.border}`,
+                                          fontSize: 9, fontWeight: 500, transition: "all .15s",
+                                        }}>{formatHour(h)}</button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+
+                                {/* Bottom action row */}
+                                <div style={{ display: "flex", gap: 4, borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
+                                  {/* Ongoing toggle */}
+                                  <button onClick={() => {
+                                    up(d => { const c = d.cells.find(x => x.id === cell.id); if (c) c.ongoing = !c.ongoing; });
+                                  }} style={{
+                                    flex: 1, padding: "5px 0", borderRadius: 6, cursor: "pointer",
+                                    background: cell.ongoing ? C.primaryLight : "transparent",
+                                    color: cell.ongoing ? C.primary : C.textMuted,
+                                    border: cell.ongoing ? `1px solid ${C.primaryBorder}` : `1px solid ${C.border}`,
+                                    fontSize: 10, fontWeight: 500, transition: "all .15s",
+                                  }}>📌 상시</button>
+
+                                  {/* Detail button */}
+                                  {linkedTasks.length > 0 && (
                                     <button onClick={() => { setSelTaskId(linkedTasks[0].id); setShowDetail(true); setPopoverCellId(null); }}
-                                      style={{ width: "100%", padding: "5px 0", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", cursor: "pointer", fontSize: 11, color: C.textSub, fontWeight: 500 }}>
+                                      style={{ flex: 1, padding: "5px 0", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", cursor: "pointer", fontSize: 10, color: C.textSub, fontWeight: 500 }}>
                                       ▸ 상세
                                     </button>
-                                  </div>
-                                )}
+                                  )}
+
+                                  {/* Delete button */}
+                                  <button onClick={() => {
+                                    clearCell(cell.id);
+                                    setPopoverCellId(null);
+                                  }} style={{
+                                    padding: "5px 8px", borderRadius: 6, cursor: "pointer",
+                                    background: "transparent", color: "#EF4444",
+                                    border: `1px solid #FECDD3`,
+                                    fontSize: 10, fontWeight: 500, transition: "all .15s",
+                                  }}>✕ 삭제</button>
+                                </div>
 
                                 {/* Arrow */}
                                 <div style={{ position: "absolute", bottom: -5, left: "50%", transform: "translateX(-50%) rotate(45deg)", width: 10, height: 10, background: C.surface, borderRight: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}` }} />
+                              </div>
+                            );
+                          })()}
+
+                          {/* Core cell popover — center cells of sub-grids */}
+                          {coreCellPopoverId === cell.id && isCellCenter && !isRootGrid && (() => {
+                            const siblingCells = data.cells.filter(c => c.boardId === cell.boardId && c.position !== 4).sort((a, b) => a.position - b.position);
+                            const filledCells = siblingCells.filter(c => c.text);
+                            const allSiblingTasks = siblingCells.flatMap(c => c.linkedTaskIds.map(id => data.tasks.find(t => t.id === id)).filter(Boolean)) as Task[];
+                            const doneTasks = allSiblingTasks.filter(t => t.status === "done" || t.status === "reflect");
+                            const sg = subGrids.find(s => s.pos === outerPos);
+                            return (
+                              <div onClick={e => e.stopPropagation()} style={{
+                                position: "absolute", zIndex: 70, left: "50%", bottom: "calc(100% + 8px)", transform: "translateX(-50%)",
+                                background: C.surface, border: `1.5px solid ${pc?.border || C.border}`, borderRadius: 14,
+                                padding: "14px 16px", minWidth: 240, maxWidth: 320,
+                                boxShadow: "0 8px 28px rgba(0,0,0,.18)",
+                              }}>
+                                {/* Title */}
+                                <div style={{ fontSize: 15, fontWeight: 800, color: pc?.text || C.primary, marginBottom: 8, textAlign: "center" }}>{cell.text}</div>
+
+                                {/* Progress bar */}
+                                <div style={{ marginBottom: 10 }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                                    <span style={{ fontSize: 10, color: C.textMuted, fontWeight: 600 }}>진행률</span>
+                                    <span style={{ fontSize: 10, color: C.textSub, fontWeight: 700 }}>{filledCells.length}/8 작성 · {doneTasks.length}/{allSiblingTasks.length || "-"} 완료</span>
+                                  </div>
+                                  <div style={{ height: 6, background: C.surfaceAlt, borderRadius: 3, overflow: "hidden" }}>
+                                    <div style={{ height: "100%", borderRadius: 3, background: `linear-gradient(90deg, ${pc?.fill || C.primary}, ${pc?.border || C.accent})`, width: `${filledCells.length > 0 ? (filledCells.length / 8) * 100 : 0}%`, transition: "width .3s" }} />
+                                  </div>
+                                </div>
+
+                                {/* Sub-cell list */}
+                                <div style={{ marginBottom: 10, maxHeight: 120, overflowY: "auto" }}>
+                                  {siblingCells.map(sc => {
+                                    const scTasks = sc.linkedTaskIds.map(id => data.tasks.find(t => t.id === id)).filter(Boolean) as Task[];
+                                    const scDone = scTasks.length > 0 && scTasks.every(t => t.status === "done" || t.status === "reflect");
+                                    return (
+                                      <div key={sc.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0", borderBottom: `1px solid ${C.border}20` }}>
+                                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: scDone ? C.accent : sc.text ? (pc?.fill || C.primaryLight) : C.surfaceAlt, border: `1px solid ${C.border}`, flexShrink: 0 }} />
+                                        <span style={{ fontSize: 11, color: sc.text ? (scDone ? C.accent : C.text) : C.textMuted, fontWeight: sc.text ? 500 : 400, textDecoration: scDone ? "line-through" : "none", flex: 1 }}>{sc.text || "(비어있음)"}</span>
+                                        {scTasks.length > 0 && <span style={{ fontSize: 9, color: C.textMuted }}>{scTasks.filter(t => t.status === "done" || t.status === "reflect").length}/{scTasks.length}</span>}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+
+                                {/* Action buttons */}
+                                <div style={{ display: "flex", gap: 4 }}>
+                                  <button onClick={() => {
+                                    if (sg?.childBoardId) { setBoardPath(p => [...p, sg.childBoardId!]); setCoreCellPopoverId(null); }
+                                  }} style={{
+                                    flex: 1, padding: "7px 0", borderRadius: 8, cursor: "pointer",
+                                    background: C.primary, color: "#fff", border: "none",
+                                    fontSize: 12, fontWeight: 700, transition: "all .15s",
+                                  }}>▸ 상세 보기</button>
+                                  <button onClick={() => {
+                                    // Add all sub-cell tasks to today
+                                    up(d => {
+                                      siblingCells.forEach(sc => {
+                                        sc.linkedTaskIds.forEach(tid => {
+                                          const t = d.tasks.find(x => x.id === tid);
+                                          if (t && t.status !== "done" && t.status !== "reflect") t._today = true;
+                                        });
+                                      });
+                                    });
+                                    setCoreCellPopoverId(null);
+                                    setToast("오늘 할 일에 추가했습니다");
+                                  }} style={{
+                                    flex: 1, padding: "7px 0", borderRadius: 8, cursor: "pointer",
+                                    background: C.warmLight, color: "#92400E", border: `1px solid ${C.warmBorder}`,
+                                    fontSize: 11, fontWeight: 600, transition: "all .15s",
+                                  }}>오늘로 추가</button>
+                                </div>
+
+                                {/* Arrow */}
+                                <div style={{ position: "absolute", bottom: -5, left: "50%", transform: "translateX(-50%) rotate(45deg)", width: 10, height: 10, background: C.surface, borderRight: `1.5px solid ${pc?.border || C.border}`, borderBottom: `1.5px solid ${pc?.border || C.border}` }} />
                               </div>
                             );
                           })()}
@@ -2397,7 +2615,7 @@ ${recentMoods || "없음"}
                     };
 
                     return (
-                      <div ref={mandalRef} className="mandal-9x9-grid" onClick={() => setPopoverCellId(null)} style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, maxWidth: 900, margin: "0 auto", padding: 4, animation: "appleIn .4s cubic-bezier(.25,.46,.45,.94)" }}>
+                      <div ref={mandalRef} className="mandal-9x9-grid" onClick={() => { setPopoverCellId(null); setCoreCellPopoverId(null); }} style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, maxWidth: 900, margin: "0 auto", padding: 4, animation: "appleIn .4s cubic-bezier(.25,.46,.45,.94)" }}>
                         {subGrids.map(sg => {
                           const isRootGrid = sg.pos === 4;
                           const pc = posTheme[sg.pos];
@@ -2612,7 +2830,7 @@ ${recentMoods || "없음"}
                   </div>
                   </>
                 )}
-                </>) : (
+                </>) : viewMode === "matrix" ? (
                   /* ===== Matrix View ===== */
                   (() => {
                     const allTasks = selFolderId
@@ -2738,6 +2956,180 @@ ${recentMoods || "없음"}
                         </div>
                         <div style={{ textAlign: "center", fontSize: 10, color: C.textMuted, marginTop: 6, opacity: 0.5 }}>
                           ↑ 중요 · ↓ 덜 중요
+                        </div>
+                      </div>
+                    );
+                  })()
+                ) : (
+                  /* ===== Timeline View ===== */
+                  (() => {
+                    const today = new Date().toISOString().slice(0, 10);
+                    const hours = Array.from({ length: 17 }, (_, i) => i + 6); // 6:00 ~ 22:00
+                    const allCells = selFolderId
+                      ? data.cells.filter(c => {
+                          const board = data.boards.find(b => b.id === c.boardId);
+                          return board?.folderId === selFolderId;
+                        })
+                      : data.cells;
+                    const filledCells = allCells.filter(c => c.text && c.position !== 4);
+                    const scheduledCells = filledCells.filter(c => {
+                      const tasks = c.linkedTaskIds.map(id => data.tasks.find(t => t.id === id)).filter(Boolean) as Task[];
+                      return tasks.some(t => t.timeSlot);
+                    });
+                    const unscheduledCells = filledCells.filter(c => {
+                      const tasks = c.linkedTaskIds.map(id => data.tasks.find(t => t.id === id)).filter(Boolean) as Task[];
+                      return !tasks.some(t => t.timeSlot);
+                    });
+
+                    return (
+                      <div style={{ animation: "appleIn .35s cubic-bezier(.25,.46,.45,.94)" }}>
+                        <div style={{ display: "flex", gap: 12, maxWidth: 700, margin: "0 auto" }}>
+                          {/* Timeline grid */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 8, textAlign: "center" }}>
+                              오늘의 시간 배치
+                            </div>
+                            <div style={{ position: "relative" }}>
+                              {hours.map(h => {
+                                const cellsAtHour = scheduledCells.filter(c => {
+                                  const tasks = c.linkedTaskIds.map(id => data.tasks.find(t => t.id === id)).filter(Boolean) as Task[];
+                                  return tasks.some(t => t.timeSlot && t.timeSlot.start === h);
+                                });
+                                return (
+                                  <div key={h}
+                                    onDragOver={e => { e.preventDefault(); e.currentTarget.style.background = C.primaryLight; }}
+                                    onDragLeave={e => { e.currentTarget.style.background = "transparent"; }}
+                                    onDrop={e => {
+                                      e.preventDefault();
+                                      e.currentTarget.style.background = "transparent";
+                                      const cellId = e.dataTransfer.getData("application/x-timeline-cell");
+                                      if (cellId) {
+                                        const cell = data.cells.find(c => c.id === cellId);
+                                        if (cell) {
+                                          up(d => {
+                                            const c = d.cells.find(x => x.id === cellId);
+                                            if (!c) return;
+                                            if (c.linkedTaskIds.length > 0) {
+                                              c.linkedTaskIds.forEach(tid => {
+                                                const t = d.tasks.find(x => x.id === tid);
+                                                if (t) { t.timeSlot = { start: h, duration: 1 }; if (!t._today) t._today = true; }
+                                              });
+                                            } else {
+                                              const taskId = uid();
+                                              d.tasks.push({ id: taskId, text: c.text, status: "placed", memo: "", folderId: d.boards.find(b => b.id === c.boardId)?.folderId || null, boardId: c.boardId, cellPosition: c.position, completedAt: null, toReflect: false, _today: true, priority: null, urgency: null, importance: null, category: null, timeSlot: { start: h, duration: 1 }, clusterId: null, deadline: null });
+                                              c.linkedTaskIds.push(taskId);
+                                            }
+                                          });
+                                        }
+                                      }
+                                    }}
+                                    style={{
+                                      display: "flex", alignItems: "stretch", gap: 0,
+                                      borderBottom: `1px solid ${C.border}30`,
+                                      minHeight: 44, transition: "background .15s",
+                                    }}>
+                                    {/* Hour label */}
+                                    <div style={{
+                                      width: 48, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+                                      fontSize: 11, fontWeight: 600, color: h === new Date().getHours() ? C.primary : C.textMuted,
+                                      borderRight: `1px solid ${C.border}30`,
+                                      background: h === new Date().getHours() ? C.primaryLight + "50" : "transparent",
+                                    }}>{formatHour(h)}</div>
+                                    {/* Slot content */}
+                                    <div style={{ flex: 1, padding: "4px 8px", display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
+                                      {cellsAtHour.map(c => {
+                                        const tasks = c.linkedTaskIds.map(id => data.tasks.find(t => t.id === id)).filter(Boolean) as Task[];
+                                        const isDone = tasks.every(t => t.status === "done" || t.status === "reflect");
+                                        const priority = tasks[0]?.priority;
+                                        const board = data.boards.find(b => b.id === c.boardId);
+                                        const parentCell = board?.parentCellId ? data.cells.find(x => x.id === board.parentCellId) : null;
+                                        return (
+                                          <div key={c.id}
+                                            draggable
+                                            onDragStart={e => { e.dataTransfer.setData("application/x-timeline-cell", c.id); e.dataTransfer.effectAllowed = "move"; }}
+                                            onClick={() => { if (tasks[0]) { setSelTaskId(tasks[0].id); setShowDetail(true); } }}
+                                            style={{
+                                              padding: "4px 10px", borderRadius: 8, cursor: "grab",
+                                              background: isDone ? C.accentLight : (c.color || C.surface),
+                                              border: `1.5px solid ${isDone ? C.accentBorder : priority === "high" ? "#EF444460" : priority === "medium" ? "#F59E0B60" : C.border}`,
+                                              fontSize: 11, fontWeight: 600,
+                                              color: isDone ? "#059669" : C.text,
+                                              textDecoration: isDone ? "line-through" : "none",
+                                              display: "flex", alignItems: "center", gap: 4,
+                                              opacity: isDone ? 0.6 : 1,
+                                            }}>
+                                            {priority && <span style={{ width: 6, height: 6, borderRadius: "50%", background: priority === "high" ? "#EF4444" : priority === "medium" ? "#F59E0B" : "#10B981", flexShrink: 0 }} />}
+                                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 120 }}>{c.text}</span>
+                                            {parentCell?.text && <span style={{ fontSize: 9, color: C.textMuted, fontWeight: 400 }}>({parentCell.text})</span>}
+                                            <button onClick={e => {
+                                              e.stopPropagation();
+                                              up(d => {
+                                                const cl = d.cells.find(x => x.id === c.id);
+                                                if (cl) cl.linkedTaskIds.forEach(tid => { const t = d.tasks.find(x => x.id === tid); if (t) t.timeSlot = null; });
+                                              });
+                                            }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 9, color: C.textMuted, padding: 0, marginLeft: 2 }}>✕</button>
+                                          </div>
+                                        );
+                                      })}
+                                      {cellsAtHour.length === 0 && (
+                                        <span style={{ fontSize: 10, color: C.textMuted, opacity: 0.3 }}>드래그하여 배치</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              {/* Current time indicator */}
+                              {(() => {
+                                const now = new Date();
+                                const currentH = now.getHours();
+                                const currentM = now.getMinutes();
+                                if (currentH < 6 || currentH > 22) return null;
+                                const top = (currentH - 6 + currentM / 60) * 44;
+                                return <div style={{ position: "absolute", left: 48, right: 0, top, height: 2, background: C.rose, zIndex: 5, borderRadius: 1, boxShadow: `0 0 4px ${C.rose}60` }}>
+                                  <div style={{ position: "absolute", left: -4, top: -3, width: 8, height: 8, borderRadius: "50%", background: C.rose }} />
+                                </div>;
+                              })()}
+                            </div>
+                          </div>
+
+                          {/* Unscheduled cells pool */}
+                          <div style={{ width: 180, flexShrink: 0 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: C.textSub, marginBottom: 8, textAlign: "center" }}>미배치 항목</div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: "calc(17 * 44px)", overflowY: "auto" }}>
+                              {unscheduledCells.map(c => {
+                                const tasks = c.linkedTaskIds.map(id => data.tasks.find(t => t.id === id)).filter(Boolean) as Task[];
+                                const isDone = tasks.length > 0 && tasks.every(t => t.status === "done" || t.status === "reflect");
+                                const priority = tasks[0]?.priority;
+                                const board = data.boards.find(b => b.id === c.boardId);
+                                const parentCell = board?.parentCellId ? data.cells.find(x => x.id === board.parentCellId) : null;
+                                return (
+                                  <div key={c.id}
+                                    draggable
+                                    onDragStart={e => { e.dataTransfer.setData("application/x-timeline-cell", c.id); e.dataTransfer.effectAllowed = "move"; }}
+                                    style={{
+                                      padding: "6px 10px", borderRadius: 8, cursor: "grab",
+                                      background: isDone ? C.accentLight : (c.color || C.surface),
+                                      border: `1.5px solid ${isDone ? C.accentBorder : C.border}`,
+                                      fontSize: 11, fontWeight: 500, color: isDone ? "#059669" : C.text,
+                                      textDecoration: isDone ? "line-through" : "none",
+                                      opacity: isDone ? 0.5 : 1,
+                                      display: "flex", alignItems: "center", gap: 4,
+                                    }}>
+                                    {priority && <span style={{ width: 6, height: 6, borderRadius: "50%", background: priority === "high" ? "#EF4444" : priority === "medium" ? "#F59E0B" : "#10B981", flexShrink: 0 }} />}
+                                    <div style={{ flex: 1, overflow: "hidden" }}>
+                                      <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.text}</div>
+                                      {parentCell?.text && <div style={{ fontSize: 9, color: C.textMuted }}>{parentCell.text}</div>}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              {unscheduledCells.length === 0 && (
+                                <div style={{ textAlign: "center", padding: 16, color: C.textMuted, fontSize: 11 }}>
+                                  모든 항목이 배치됨
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     );
