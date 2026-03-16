@@ -354,8 +354,8 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(!loadProfile()?.completed);
 
   const [dragCellId, setDragCellId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"mandal" | "matrix" | "timeline">("mandal");
-  const [showTimeline, setShowTimeline] = useState(false);
+  const [viewMode, setViewMode] = useState<"mandal" | "matrix">("mandal");
+  // showTimeline removed — timeline is now a sidebar
   const [coreCellPopoverId, setCoreCellPopoverId] = useState<string | null>(null);
 
   // Coach chat state
@@ -2146,7 +2146,7 @@ ${recentMoods || "없음"}
                 {/* === View Mode Segment Control === */}
                 <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
                   <div style={{ display: "inline-flex", background: C.surfaceAlt, borderRadius: 10, padding: 3, gap: 2 }}>
-                    {([["mandal", "만다라트"], ["matrix", "매트릭스"], ["timeline", "타임라인"]] as const).map(([key, label]) => (
+                    {([["mandal", "만다라트"], ["matrix", "매트릭스"]] as const).map(([key, label]) => (
                       <button key={key} className="seg-btn" onClick={() => setViewMode(key as any)}
                         style={{
                           padding: "7px 18px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
@@ -2446,39 +2446,7 @@ ${recentMoods || "없음"}
                                   </div>
                                 </div>
 
-                                {/* Time slot quick assign */}
-                                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                                  <span style={{ fontSize: 10, color: C.textMuted, fontWeight: 600, minWidth: 36 }}>시간</span>
-                                  <div style={{ display: "flex", gap: 2, flex: 1, flexWrap: "wrap" }}>
-                                    {[6, 8, 9, 10, 11, 13, 14, 15, 16, 18, 20].map(h => {
-                                      const hasSlot = linkedTasks.some(t => t.timeSlot?.start === h);
-                                      return (
-                                        <button key={h} onClick={() => {
-                                          up(d => {
-                                            const c = d.cells.find(x => x.id === cell.id);
-                                            if (!c) return;
-                                            if (c.linkedTaskIds.length > 0) {
-                                              c.linkedTaskIds.forEach(tid => {
-                                                const t = d.tasks.find(x => x.id === tid);
-                                                if (t) { t.timeSlot = hasSlot ? null : { start: h, duration: 1 }; if (!t._today) t._today = true; }
-                                              });
-                                            } else {
-                                              const taskId = uid();
-                                              d.tasks.push({ id: taskId, text: c.text, status: "placed", memo: "", folderId: d.boards.find(b => b.id === c.boardId)?.folderId || null, boardId: c.boardId, cellPosition: c.position, completedAt: null, toReflect: false, _today: true, priority: null, urgency: null, importance: null, category: null, timeSlot: { start: h, duration: 1 }, clusterId: null, deadline: null });
-                                              c.linkedTaskIds.push(taskId);
-                                            }
-                                          });
-                                        }} style={{
-                                          padding: "2px 4px", borderRadius: 4, cursor: "pointer",
-                                          background: hasSlot ? C.primary : C.surfaceAlt,
-                                          color: hasSlot ? "#fff" : C.textMuted,
-                                          border: `1px solid ${hasSlot ? C.primary : C.border}`,
-                                          fontSize: 9, fontWeight: 500, transition: "all .15s",
-                                        }}>{formatHour(h)}</button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
+
 
                                 {/* Bottom action row */}
                                 <div style={{ display: "flex", gap: 4, borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
@@ -2830,7 +2798,7 @@ ${recentMoods || "없음"}
                   </div>
                   </>
                 )}
-                </>) : viewMode === "matrix" ? (
+                </>) : (
                   /* ===== Matrix View ===== */
                   (() => {
                     const allTasks = selFolderId
@@ -2960,183 +2928,114 @@ ${recentMoods || "없음"}
                       </div>
                     );
                   })()
-                ) : (
-                  /* ===== Timeline View ===== */
-                  (() => {
-                    const today = new Date().toISOString().slice(0, 10);
-                    const hours = Array.from({ length: 17 }, (_, i) => i + 6); // 6:00 ~ 22:00
-                    const allCells = selFolderId
-                      ? data.cells.filter(c => {
-                          const board = data.boards.find(b => b.id === c.boardId);
-                          return board?.folderId === selFolderId;
-                        })
-                      : data.cells;
-                    const filledCells = allCells.filter(c => c.text && c.position !== 4);
-                    const scheduledCells = filledCells.filter(c => {
-                      const tasks = c.linkedTaskIds.map(id => data.tasks.find(t => t.id === id)).filter(Boolean) as Task[];
-                      return tasks.some(t => t.timeSlot);
-                    });
-                    const unscheduledCells = filledCells.filter(c => {
-                      const tasks = c.linkedTaskIds.map(id => data.tasks.find(t => t.id === id)).filter(Boolean) as Task[];
-                      return !tasks.some(t => t.timeSlot);
-                    });
-
-                    return (
-                      <div style={{ animation: "appleIn .35s cubic-bezier(.25,.46,.45,.94)" }}>
-                        <div style={{ display: "flex", gap: 12, maxWidth: 700, margin: "0 auto" }}>
-                          {/* Timeline grid */}
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 8, textAlign: "center" }}>
-                              오늘의 시간 배치
-                            </div>
-                            <div style={{ position: "relative" }}>
-                              {hours.map(h => {
-                                const cellsAtHour = scheduledCells.filter(c => {
-                                  const tasks = c.linkedTaskIds.map(id => data.tasks.find(t => t.id === id)).filter(Boolean) as Task[];
-                                  return tasks.some(t => t.timeSlot && t.timeSlot.start === h);
-                                });
-                                return (
-                                  <div key={h}
-                                    onDragOver={e => { e.preventDefault(); e.currentTarget.style.background = C.primaryLight; }}
-                                    onDragLeave={e => { e.currentTarget.style.background = "transparent"; }}
-                                    onDrop={e => {
-                                      e.preventDefault();
-                                      e.currentTarget.style.background = "transparent";
-                                      const cellId = e.dataTransfer.getData("application/x-timeline-cell");
-                                      if (cellId) {
-                                        const cell = data.cells.find(c => c.id === cellId);
-                                        if (cell) {
-                                          up(d => {
-                                            const c = d.cells.find(x => x.id === cellId);
-                                            if (!c) return;
-                                            if (c.linkedTaskIds.length > 0) {
-                                              c.linkedTaskIds.forEach(tid => {
-                                                const t = d.tasks.find(x => x.id === tid);
-                                                if (t) { t.timeSlot = { start: h, duration: 1 }; if (!t._today) t._today = true; }
-                                              });
-                                            } else {
-                                              const taskId = uid();
-                                              d.tasks.push({ id: taskId, text: c.text, status: "placed", memo: "", folderId: d.boards.find(b => b.id === c.boardId)?.folderId || null, boardId: c.boardId, cellPosition: c.position, completedAt: null, toReflect: false, _today: true, priority: null, urgency: null, importance: null, category: null, timeSlot: { start: h, duration: 1 }, clusterId: null, deadline: null });
-                                              c.linkedTaskIds.push(taskId);
-                                            }
-                                          });
-                                        }
-                                      }
-                                    }}
-                                    style={{
-                                      display: "flex", alignItems: "stretch", gap: 0,
-                                      borderBottom: `1px solid ${C.border}30`,
-                                      minHeight: 44, transition: "background .15s",
-                                    }}>
-                                    {/* Hour label */}
-                                    <div style={{
-                                      width: 48, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-                                      fontSize: 11, fontWeight: 600, color: h === new Date().getHours() ? C.primary : C.textMuted,
-                                      borderRight: `1px solid ${C.border}30`,
-                                      background: h === new Date().getHours() ? C.primaryLight + "50" : "transparent",
-                                    }}>{formatHour(h)}</div>
-                                    {/* Slot content */}
-                                    <div style={{ flex: 1, padding: "4px 8px", display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
-                                      {cellsAtHour.map(c => {
-                                        const tasks = c.linkedTaskIds.map(id => data.tasks.find(t => t.id === id)).filter(Boolean) as Task[];
-                                        const isDone = tasks.every(t => t.status === "done" || t.status === "reflect");
-                                        const priority = tasks[0]?.priority;
-                                        const board = data.boards.find(b => b.id === c.boardId);
-                                        const parentCell = board?.parentCellId ? data.cells.find(x => x.id === board.parentCellId) : null;
-                                        return (
-                                          <div key={c.id}
-                                            draggable
-                                            onDragStart={e => { e.dataTransfer.setData("application/x-timeline-cell", c.id); e.dataTransfer.effectAllowed = "move"; }}
-                                            onClick={() => { if (tasks[0]) { setSelTaskId(tasks[0].id); setShowDetail(true); } }}
-                                            style={{
-                                              padding: "4px 10px", borderRadius: 8, cursor: "grab",
-                                              background: isDone ? C.accentLight : (c.color || C.surface),
-                                              border: `1.5px solid ${isDone ? C.accentBorder : priority === "high" ? "#EF444460" : priority === "medium" ? "#F59E0B60" : C.border}`,
-                                              fontSize: 11, fontWeight: 600,
-                                              color: isDone ? "#059669" : C.text,
-                                              textDecoration: isDone ? "line-through" : "none",
-                                              display: "flex", alignItems: "center", gap: 4,
-                                              opacity: isDone ? 0.6 : 1,
-                                            }}>
-                                            {priority && <span style={{ width: 6, height: 6, borderRadius: "50%", background: priority === "high" ? "#EF4444" : priority === "medium" ? "#F59E0B" : "#10B981", flexShrink: 0 }} />}
-                                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 120 }}>{c.text}</span>
-                                            {parentCell?.text && <span style={{ fontSize: 9, color: C.textMuted, fontWeight: 400 }}>({parentCell.text})</span>}
-                                            <button onClick={e => {
-                                              e.stopPropagation();
-                                              up(d => {
-                                                const cl = d.cells.find(x => x.id === c.id);
-                                                if (cl) cl.linkedTaskIds.forEach(tid => { const t = d.tasks.find(x => x.id === tid); if (t) t.timeSlot = null; });
-                                              });
-                                            }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 9, color: C.textMuted, padding: 0, marginLeft: 2 }}>✕</button>
-                                          </div>
-                                        );
-                                      })}
-                                      {cellsAtHour.length === 0 && (
-                                        <span style={{ fontSize: 10, color: C.textMuted, opacity: 0.3 }}>드래그하여 배치</span>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                              {/* Current time indicator */}
-                              {(() => {
-                                const now = new Date();
-                                const currentH = now.getHours();
-                                const currentM = now.getMinutes();
-                                if (currentH < 6 || currentH > 22) return null;
-                                const top = (currentH - 6 + currentM / 60) * 44;
-                                return <div style={{ position: "absolute", left: 48, right: 0, top, height: 2, background: C.rose, zIndex: 5, borderRadius: 1, boxShadow: `0 0 4px ${C.rose}60` }}>
-                                  <div style={{ position: "absolute", left: -4, top: -3, width: 8, height: 8, borderRadius: "50%", background: C.rose }} />
-                                </div>;
-                              })()}
-                            </div>
-                          </div>
-
-                          {/* Unscheduled cells pool */}
-                          <div style={{ width: 180, flexShrink: 0 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: C.textSub, marginBottom: 8, textAlign: "center" }}>미배치 항목</div>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: "calc(17 * 44px)", overflowY: "auto" }}>
-                              {unscheduledCells.map(c => {
-                                const tasks = c.linkedTaskIds.map(id => data.tasks.find(t => t.id === id)).filter(Boolean) as Task[];
-                                const isDone = tasks.length > 0 && tasks.every(t => t.status === "done" || t.status === "reflect");
-                                const priority = tasks[0]?.priority;
-                                const board = data.boards.find(b => b.id === c.boardId);
-                                const parentCell = board?.parentCellId ? data.cells.find(x => x.id === board.parentCellId) : null;
-                                return (
-                                  <div key={c.id}
-                                    draggable
-                                    onDragStart={e => { e.dataTransfer.setData("application/x-timeline-cell", c.id); e.dataTransfer.effectAllowed = "move"; }}
-                                    style={{
-                                      padding: "6px 10px", borderRadius: 8, cursor: "grab",
-                                      background: isDone ? C.accentLight : (c.color || C.surface),
-                                      border: `1.5px solid ${isDone ? C.accentBorder : C.border}`,
-                                      fontSize: 11, fontWeight: 500, color: isDone ? "#059669" : C.text,
-                                      textDecoration: isDone ? "line-through" : "none",
-                                      opacity: isDone ? 0.5 : 1,
-                                      display: "flex", alignItems: "center", gap: 4,
-                                    }}>
-                                    {priority && <span style={{ width: 6, height: 6, borderRadius: "50%", background: priority === "high" ? "#EF4444" : priority === "medium" ? "#F59E0B" : "#10B981", flexShrink: 0 }} />}
-                                    <div style={{ flex: 1, overflow: "hidden" }}>
-                                      <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.text}</div>
-                                      {parentCell?.text && <div style={{ fontSize: 9, color: C.textMuted }}>{parentCell.text}</div>}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                              {unscheduledCells.length === 0 && (
-                                <div style={{ textAlign: "center", padding: 16, color: C.textMuted, fontSize: 11 }}>
-                                  모든 항목이 배치됨
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()
                 )}
 
                 </div>{/* end right column */}
+
+                {/* ===== Timeline Sidebar ===== */}
+                {viewMode === "mandal" && (() => {
+                  const allTasks = selFolderId
+                    ? data.tasks.filter(t => t.folderId === selFolderId)
+                    : data.tasks;
+                  // Collect upcoming deadlines and ongoing items
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const timelineItems: { date: string; dateLabel: string; title: string; taskId: string; priority: string | null; status: string; subtasks: string[]; color: string }[] = [];
+
+                  // Tasks with deadlines
+                  allTasks.filter(t => t.deadline && t.status !== "done" && t.status !== "reflect").forEach(t => {
+                    const d = new Date(t.deadline!);
+                    const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
+                    const dateLabel = `${String(d.getMonth() + 1).padStart(2, "0")}월 ${String(d.getDate()).padStart(2, "0")}일 (${dayNames[d.getDay()]})`;
+                    // Find related sub-tasks (child board cells)
+                    const cell = data.cells.find(c => c.linkedTaskIds.includes(t.id));
+                    const childBoard = cell?.childBoardId;
+                    const subtasks = childBoard
+                      ? data.cells.filter(c => c.boardId === childBoard && c.position !== 4 && c.text).map(c => c.text)
+                      : [];
+                    timelineItems.push({ date: t.deadline!, dateLabel, title: t.text, taskId: t.id, priority: t.priority, status: t.status, subtasks, color: cell?.color || "" });
+                  });
+
+                  // Ongoing cells without deadlines (show as pinned at top)
+                  const ongoingCells = data.cells.filter(c => c.ongoing && c.text);
+                  const ongoingItems = ongoingCells.map(c => {
+                    const tasks = c.linkedTaskIds.map(id => data.tasks.find(t => t.id === id)).filter(Boolean) as Task[];
+                    return { date: "", dateLabel: "", title: c.text, taskId: tasks[0]?.id || "", priority: tasks[0]?.priority || null, status: tasks[0]?.status || "placed", subtasks: [] as string[], color: c.color || "" };
+                  });
+
+                  // Sort by date
+                  timelineItems.sort((a, b) => a.date.localeCompare(b.date));
+
+                  if (ongoingItems.length === 0 && timelineItems.length === 0) return null;
+
+                  return (
+                    <div style={{
+                      width: 220, flexShrink: 0, padding: "0 8px",
+                      borderLeft: `1px solid ${C.border}30`,
+                      maxHeight: "calc(100vh - 160px)", overflowY: "auto",
+                    }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: C.text, marginBottom: 12, textAlign: "center" }}>타임라인</div>
+
+                      {/* Vertical timeline */}
+                      <div style={{ position: "relative", paddingLeft: 16 }}>
+                        {/* Vertical line */}
+                        <div style={{ position: "absolute", left: 5, top: 0, bottom: 0, width: 2, background: `linear-gradient(to bottom, ${C.primaryBorder}, ${C.border}30)`, borderRadius: 1 }} />
+
+                        {/* Ongoing items */}
+                        {ongoingItems.map((item, i) => (
+                          <div key={`ongoing-${i}`} style={{ position: "relative", marginBottom: 16, cursor: "pointer" }}
+                            onClick={() => { if (item.taskId) { setSelTaskId(item.taskId); setShowDetail(true); } }}>
+                            {/* Dot */}
+                            <div style={{ position: "absolute", left: -14, top: 4, width: 10, height: 10, borderRadius: "50%", background: C.primary, border: `2px solid ${C.surface}`, zIndex: 2 }} />
+                            {/* Card */}
+                            <div style={{
+                              background: item.color || C.primaryLight, borderRadius: 10, padding: "8px 12px",
+                              border: `1px solid ${C.primaryBorder}`, boxShadow: "0 1px 4px rgba(0,0,0,.04)",
+                            }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: C.primary }}>{item.title}</div>
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Deadline items */}
+                        {timelineItems.map((item, i) => {
+                          const diff = Math.ceil((new Date(item.date).getTime() - today.getTime()) / 86400000);
+                          const dotColor = item.priority === "high" || diff < 0 ? "#EF4444" : item.priority === "medium" || diff <= 2 ? "#F59E0B" : C.accent;
+                          return (
+                            <div key={`dl-${i}`} style={{ position: "relative", marginBottom: 16, cursor: "pointer" }}
+                              onClick={() => { if (item.taskId) { setSelTaskId(item.taskId); setShowDetail(true); } }}>
+                              {/* Dot */}
+                              <div style={{ position: "absolute", left: -14, top: 4, width: 10, height: 10, borderRadius: "50%", background: dotColor, border: `2px solid ${C.surface}`, zIndex: 2 }} />
+                              {/* Card */}
+                              <div style={{
+                                background: item.color || C.surface, borderRadius: 10, padding: "8px 12px",
+                                border: `1px solid ${C.border}`, boxShadow: "0 1px 4px rgba(0,0,0,.04)",
+                              }}>
+                                <div style={{ fontSize: 10, color: dotColor, fontWeight: 600, marginBottom: 2 }}>{item.dateLabel} —</div>
+                                <div style={{ fontSize: 12, fontWeight: 800, color: C.text }}>{item.title}</div>
+                                {item.subtasks.length > 0 && (
+                                  <div style={{ marginTop: 4 }}>
+                                    {item.subtasks.slice(0, 3).map((st, j) => (
+                                      <div key={j} style={{ fontSize: 10, color: C.textSub, lineHeight: 1.6 }}>• {st}</div>
+                                    ))}
+                                    {item.subtasks.length > 3 && <div style={{ fontSize: 9, color: C.textMuted }}>+{item.subtasks.length - 3}개 더</div>}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {timelineItems.length === 0 && ongoingItems.length === 0 && (
+                          <div style={{ textAlign: "center", padding: 20, color: C.textMuted, fontSize: 11 }}>
+                            마감일이 설정된 항목이 없습니다
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 </div>{/* end 2-column layout */}
 
                 {/* Folder memo + links + deadlines */}
